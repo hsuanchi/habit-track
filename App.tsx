@@ -3,14 +3,12 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
   Tooltip
 } from 'recharts';
-import { Plus, Check, Trash2, Trophy, Zap, Brain, Activity, Smile, Sword, Calendar, LogOut, Skull, AlertCircle, Heart, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Check, Trash2, Trophy, Zap, Brain, Activity, Sword, Calendar, LogOut, Skull, AlertCircle, Heart, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { Habit, UserStats, StatType, STAT_LABELS, User, HabitType, GratitudeEntry } from './types';
 import { Login } from './components/Login';
 import { ContributionGraph } from './components/ContributionGraph';
 import { MockDB } from './services/db';
-import { ApiKeySelector } from './components/ApiKeySelector';
-import { AvatarGenerator } from './components/AvatarGenerator';
 
 const STAT_ICONS: Record<StatType, React.ReactNode> = {
   BODY: <Activity className="w-4 h-4" />,
@@ -33,7 +31,6 @@ const App: React.FC = () => {
   // UI State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [showAvatarGen, setShowAvatarGen] = useState(false);
   const [showGratitudeHistory, setShowGratitudeHistory] = useState(false);
   
   // Dashboard view state: 'positive' or 'negative'
@@ -208,7 +205,7 @@ const App: React.FC = () => {
   const radarData = Object.entries(stats.attributes).map(([key, value]) => ({
     subject: STAT_LABELS[key as StatType],
     A: value,
-    fullMark: Math.max(...Object.values(stats.attributes)) * 1.2
+    fullMark: Math.max(...(Object.values(stats.attributes) as number[])) * 1.2
   }));
 
   const isSelectedToday = isSameDay(selectedDate, new Date());
@@ -221,8 +218,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-20">
-      <ApiKeySelector onKeySelected={() => {}} />
-
+      
       {/* Header */}
       <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -237,13 +233,6 @@ const App: React.FC = () => {
              <div className="text-sm text-slate-400 mr-2">
                 Hello, <span className="text-white font-semibold">{user.username}</span>
              </div>
-             <button
-              onClick={() => setShowAvatarGen(!showAvatarGen)}
-              className={`p-2 rounded-full transition-colors ${showAvatarGen ? 'bg-[#ff6b35]/20 text-[#ff6b35]' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
-              title="Avatar Generator"
-            >
-              <Smile className="w-5 h-5" />
-            </button>
             <button 
               onClick={handleLogout}
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors"
@@ -254,13 +243,6 @@ const App: React.FC = () => {
           </div>
         </div>
       </header>
-
-      {/* Avatar Generator Panel */}
-      {showAvatarGen && (
-        <div className="max-w-7xl mx-auto px-4 mt-6 animate-in slide-in-from-top-4 duration-300">
-          <AvatarGenerator stats={stats} />
-        </div>
-      )}
 
       <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
         
