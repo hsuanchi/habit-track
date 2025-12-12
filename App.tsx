@@ -1,20 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
-  Tooltip
-} from 'recharts';
-import { Plus, Check, Trash2, Trophy, Zap, Brain, Activity, Sword, Calendar, LogOut, Skull, AlertCircle, Heart, Send, ChevronDown, ChevronUp } from 'lucide-react';
-import { format, isSameDay } from 'date-fns';
+import { Trophy, LogOut, Calendar, BarChart2 } from 'lucide-react';
+import { format } from 'date-fns';
 import { Habit, UserStats, StatType, STAT_LABELS, User, HabitType, GratitudeEntry } from './types';
 import { Login } from './components/Login';
 import { ContributionGraph } from './components/ContributionGraph';
 import { MockDB } from './services/db';
 
-const STAT_ICONS: Record<StatType, React.ReactNode> = {
-  BODY: <Activity className="w-4 h-4" />,
-  MIND: <Brain className="w-4 h-4" />,
-  SOUL: <Heart className="w-4 h-4" />,
-};
+// Sub Components
+import { StatsOverview } from './components/StatsOverview';
+import { HabitList, STAT_ICONS } from './components/HabitList';
+import { GratitudeSection } from './components/GratitudeSection';
+import { WeeklyChart } from './components/WeeklyChart';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -31,16 +27,15 @@ const App: React.FC = () => {
   // UI State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [showGratitudeHistory, setShowGratitudeHistory] = useState(false);
   
-  // Dashboard view state: 'positive' or 'negative'
+  // View States
   const [dashboardView, setDashboardView] = useState<'positive' | 'negative'>('positive');
-  
+  const [chartMode, setChartMode] = useState<'monthly' | 'weekly'>('monthly');
+
   // Form State
   const [newHabitTitle, setNewHabitTitle] = useState('');
   const [newHabitStat, setNewHabitStat] = useState<StatType>('BODY');
   const [newHabitType, setNewHabitType] = useState<HabitType>('good');
-  const [gratitudeInput, setGratitudeInput] = useState('');
 
   // Check for existing session
   useEffect(() => {
@@ -69,9 +64,13 @@ const App: React.FC = () => {
     localStorage.removeItem('rpg_current_user');
     setHabits([]);
     setGratitudeLogs([]);
+    setStats({
+      level: 1, currentXp: 0, nextLevelXp: 100,
+      attributes: { BODY: 1, MIND: 1, SOUL: 1 }
+    });
   };
 
-  // Auto-save whenever data changes
+  // Auto-save
   useEffect(() => {
     if (user) {
       MockDB.save(user.username, { habits, gratitudeLogs, stats });
@@ -99,7 +98,7 @@ const App: React.FC = () => {
   };
 
   const deleteHabit = (id: string) => {
-    if (confirm('Are you sure you want to delete this habit? History will be kept but it will disappear from the list.')) {
+    if (confirm('Delete this habit?')) {
        setHabits(habits.filter(h => h.id !== id));
     }
   };
@@ -144,12 +143,10 @@ const App: React.FC = () => {
       const multiplier = habit.type === 'good' ? 1 : -1;
 
       if (isCompleted) {
-        // Undoing
         newCompletedDates = habit.completedDates.filter(d => d !== dateStr);
         xpChange = -1 * habit.xpReward * multiplier;
         statChange = -1 * habit.statReward * multiplier;
       } else {
-        // Doing
         newCompletedDates = [...habit.completedDates, dateStr];
         xpChange = habit.xpReward * multiplier;
         statChange = habit.statReward * multiplier;
@@ -158,32 +155,25 @@ const App: React.FC = () => {
       updateStats(xpChange, habit.stat, statChange);
 
       return prevHabits.map(h => 
-        h.id === id 
-          ? { ...h, completedDates: newCompletedDates } 
-          : h
+        h.id === id ? { ...h, completedDates: newCompletedDates } : h
       );
     });
   };
 
-  const addGratitude = () => {
-    if (!gratitudeInput.trim()) return;
+  const handleAddGratitude = (text: string) => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    
     const newEntry: GratitudeEntry = {
       id: crypto.randomUUID(),
       date: dateStr,
-      content: gratitudeInput,
+      content: text,
       createdAt: new Date().toISOString()
     };
-
     setGratitudeLogs(prev => [newEntry, ...prev]);
-    setGratitudeInput('');
-    // Reward for gratitude: XP +5, Soul +1
     updateStats(5, 'SOUL', 1);
   };
 
-  const deleteGratitude = (id: string) => {
-    if (confirm('Delete this gratitude entry? (Rewards will be deducted)')) {
+  const handleDeleteGratitude = (id: string) => {
+    if (confirm('Delete this gratitude entry?')) {
       setGratitudeLogs(prev => prev.filter(g => g.id !== id));
       updateStats(-5, 'SOUL', -1);
     }
@@ -195,26 +185,18 @@ const App: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500">Loading...</div>;
+    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500 animate-pulse">Loading Realm...</div>;
   }
 
   if (!user) {
     return <Login onLogin={handleLogin} />;
   }
 
-  const radarData = Object.entries(stats.attributes).map(([key, value]) => ({
-    subject: STAT_LABELS[key as StatType],
-    A: value,
-    fullMark: Math.max(...(Object.values(stats.attributes) as number[])) * 1.2
-  }));
-
-  const isSelectedToday = isSameDay(selectedDate, new Date());
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
-  
   const goodHabits = habits.filter(h => h.type === 'good');
   const badHabits = habits.filter(h => h.type === 'bad');
   const dailyGratitudes = gratitudeLogs.filter(g => g.date === dateStr);
-  const historyGratitudes = gratitudeLogs.slice(0, 30); // Last 30 entries
+  const historyGratitudes = gratitudeLogs.slice(0, 30);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-20">
@@ -235,8 +217,7 @@ const App: React.FC = () => {
              </div>
             <button 
               onClick={handleLogout}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors"
-              title="Logout"
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors flex items-center gap-2"
             >
               <LogOut className="w-5 h-5" />
             </button>
@@ -246,129 +227,78 @@ const App: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
         
-        {/* Top Section: Character Stats Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Level & XP Card - Square Layout */}
-          <div className="aspect-square bg-slate-900 rounded-2xl border border-slate-800 p-8 shadow-xl relative overflow-hidden flex flex-col items-center justify-center text-center">
-             {/* Background Decoration */}
-             <div className="absolute top-0 right-0 w-64 h-64 bg-[#ff6b35]/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        {/* New Refactored Stats Overview */}
+        <StatsOverview stats={stats} username={user.username} />
 
-             <div className="flex items-center gap-2 mb-6">
-                <Sword className="w-6 h-6 text-[#ff6b35]" />
-                <h2 className="text-2xl font-bold text-white">Status</h2>
-             </div>
-
-             <div className="relative mb-8">
-               <div className="w-32 h-32 bg-slate-950 rounded-full border-4 border-[#ff6b35]/30 flex items-center justify-center shadow-[0_0_30px_rgba(255,107,53,0.2)]">
-                  <span className="text-6xl font-black text-white">{stats.level}</span>
-               </div>
-               <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#ff6b35] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-lg">Level</span>
-             </div>
-
-             <div className="w-full max-w-xs space-y-2">
-               <div className="flex justify-between text-xs font-mono text-[#ff6b35]/80 uppercase tracking-wider">
-                  <span>Experience</span>
-                  <span>{stats.currentXp} / {stats.nextLevelXp}</span>
-               </div>
-               
-               <div className="w-full h-4 bg-slate-950 rounded-full overflow-hidden border border-slate-700/50">
-                  <div 
-                    className="h-full bg-gradient-to-r from-[#ff6b35] to-orange-400 shadow-[0_0_15px_rgba(255,107,53,0.5)] transition-all duration-700 ease-out"
-                    style={{ width: `${Math.min(100, (stats.currentXp / stats.nextLevelXp) * 100)}%` }}
-                  />
-               </div>
-               <p className="text-slate-500 text-sm mt-4">Rank: {Math.floor(stats.level / 10) + 1} • {user.username}</p>
-             </div>
-          </div>
-
-          {/* Attributes Radar (Square) */}
-          <div className="aspect-square bg-slate-900 rounded-2xl border border-slate-800 p-4 shadow-xl flex flex-col justify-center items-center relative overflow-hidden">
-             <div className="absolute top-6 left-6 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-[#ff6b35]" />
-                <h3 className="text-lg font-bold text-slate-300">Attributes</h3>
-             </div>
-             
-             <div className="w-full h-full p-4 mt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
-                    <PolarGrid stroke="#334155" />
-                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 14, fontWeight: 'bold' }} />
-                    <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
-                    <Radar
-                        name="Stats"
-                        dataKey="A"
-                        stroke="#ff6b35"
-                        fill="#ff6b35"
-                        fillOpacity={0.5}
-                    />
-                    <Tooltip 
-                        contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f1f5f9', fontSize: '14px' }}
-                        itemStyle={{ color: '#ff6b35' }}
-                    />
-                    </RadarChart>
-                </ResponsiveContainer>
-             </div>
-             
-             <div className="absolute bottom-6 w-full flex justify-center gap-6 text-sm font-mono text-slate-400">
-                {Object.entries(stats.attributes).map(([k, v]) => (
-                  <div key={k} className="flex flex-col items-center">
-                    <span className="text-xs text-[#ff6b35] font-bold">{k}</span>
-                    <span className="text-white font-bold text-lg">{v}</span>
-                  </div>
-                ))}
-             </div>
-          </div>
-        </div>
-
-        {/* Middle Section: Dashboard */}
+        {/* Dashboard (Monthly/Weekly Charts) */}
         <div className="bg-slate-900 rounded-2xl border border-slate-800 p-8 shadow-xl">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
               <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                <Calendar className="w-6 h-6 text-[#ff6b35]" />
+                {chartMode === 'monthly' ? <Calendar className="w-6 h-6 text-[#ff6b35]" /> : <BarChart2 className="w-6 h-6 text-[#ff6b35]" />}
                 Activity Log
               </h2>
               
-              <div className="flex gap-2 p-1 bg-slate-950 rounded-lg border border-slate-800">
-                <button
-                  onClick={() => setDashboardView('positive')}
-                  className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
-                    dashboardView === 'positive' 
-                      ? 'bg-[#ff6b35] text-white shadow shadow-orange-500/20' 
-                      : 'text-slate-500 hover:text-slate-300'
-                  }`}
-                >
-                  Positive
-                </button>
-                <button
-                  onClick={() => setDashboardView('negative')}
-                  className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
-                    dashboardView === 'negative' 
-                      ? 'bg-rose-600 text-white shadow' 
-                      : 'text-slate-500 hover:text-slate-300'
-                  }`}
-                >
-                  Negative
-                </button>
+              <div className="flex gap-4">
+                {/* View Toggle (Monthly / Weekly) */}
+                <div className="flex gap-1 p-1 bg-slate-950 rounded-lg border border-slate-800">
+                   <button
+                    onClick={() => setChartMode('monthly')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                      chartMode === 'monthly' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'
+                    }`}
+                   >
+                     Monthly
+                   </button>
+                   <button
+                    onClick={() => setChartMode('weekly')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                      chartMode === 'weekly' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'
+                    }`}
+                   >
+                     Weekly
+                   </button>
+                </div>
+
+                {/* Filter Toggle (Positive / Negative) */}
+                <div className="flex gap-1 p-1 bg-slate-950 rounded-lg border border-slate-800">
+                  <button
+                    onClick={() => setDashboardView('positive')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                      dashboardView === 'positive' 
+                        ? 'bg-[#ff6b35] text-white shadow shadow-orange-500/20' 
+                        : 'text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    Good
+                  </button>
+                  <button
+                    onClick={() => setDashboardView('negative')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                      dashboardView === 'negative' 
+                        ? 'bg-rose-600 text-white shadow' 
+                        : 'text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    Bad
+                  </button>
+                </div>
               </div>
             </div>
 
-            {dashboardView === 'positive' ? (
-              <ContributionGraph 
-                title="Consistency Tracker"
-                habits={goodHabits}
-                gratitudeLogs={gratitudeLogs}
-                selectedDate={selectedDate}
-                onDateSelect={setSelectedDate}
-                theme="emerald" 
-              />
+            {chartMode === 'monthly' ? (
+               <ContributionGraph 
+                 title={dashboardView === 'positive' ? "Consistency Map" : "Relapse Map"}
+                 habits={dashboardView === 'positive' ? goodHabits : badHabits}
+                 gratitudeLogs={dashboardView === 'positive' ? gratitudeLogs : []}
+                 selectedDate={selectedDate}
+                 onDateSelect={setSelectedDate}
+                 theme={dashboardView === 'positive' ? 'emerald' : 'rose'}
+               />
             ) : (
-              <ContributionGraph 
-                title="Relapse Tracker"
-                habits={badHabits}
-                selectedDate={selectedDate}
-                onDateSelect={setSelectedDate}
-                theme="rose"
-              />
+               <>
+                 <h3 className="text-lg font-bold text-slate-300 mb-2">Weekly Completion (Good Habits)</h3>
+                 <WeeklyChart habits={habits} />
+               </>
             )}
         </div>
 
@@ -376,175 +306,33 @@ const App: React.FC = () => {
              {format(selectedDate, 'MMMM d, yyyy')}
         </div>
 
-        {/* Bottom Grid: Habits & Logs */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Column 1: Habits */}
           <div className="space-y-8">
-             {/* Good Habits */}
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-[#ff6b35]" /> Good Habits
-                </h2>
-                <button 
-                  onClick={() => openAddModal('good')}
-                  className="bg-[#ff6b35] hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 shadow-lg shadow-[#ff6b35]/20"
-                >
-                  <Plus className="w-4 h-4" /> Add
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                {goodHabits.length === 0 && <p className="text-slate-500 text-center py-4">No habits added yet.</p>}
-                {goodHabits.map(habit => {
-                  const isCompleted = habit.completedDates.includes(dateStr);
-                  return (
-                    <div key={habit.id} className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
-                      isCompleted ? 'bg-[#ff6b35]/20 border-[#ff6b35]/50' : 'bg-slate-950 border-slate-800'
-                    }`}>
-                      <div className="flex items-center gap-4 flex-1">
-                        <button
-                          onClick={() => toggleHabitCompletion(habit.id)}
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
-                            isCompleted ? 'bg-[#ff6b35] text-white scale-110' : 'bg-slate-800 text-slate-600 hover:bg-slate-700'
-                          }`}
-                        >
-                          <Check className="w-6 h-6" />
-                        </button>
-                        <div>
-                          <h3 className={`font-semibold text-lg ${isCompleted ? 'text-slate-400' : 'text-slate-100'}`}>{habit.title}</h3>
-                          <div className="flex gap-2 text-xs text-slate-500">
-                            <span className="bg-slate-900 px-2 py-0.5 rounded text-[#ff6b35] font-bold">{habit.stat} +{habit.statReward}</span>
-                            <span className="bg-slate-900 px-2 py-0.5 rounded text-indigo-300 font-bold">XP +{habit.xpReward}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <button onClick={() => deleteHabit(habit.id)} className="text-slate-600 hover:text-red-400 p-2">
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Bad Habits */}
-            <div className="bg-slate-900 rounded-2xl border border-rose-900/30 p-6 shadow-xl">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Skull className="w-5 h-5 text-rose-400" /> Bad Habits
-                </h2>
-                <button 
-                  onClick={() => openAddModal('bad')}
-                  className="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 shadow-lg shadow-rose-500/20"
-                >
-                  <Plus className="w-4 h-4" /> Add
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                {badHabits.length === 0 && <p className="text-slate-500 text-center py-4">No bad habits tracked.</p>}
-                {badHabits.map(habit => {
-                  const isCompleted = habit.completedDates.includes(dateStr);
-                  return (
-                    <div key={habit.id} className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
-                      isCompleted ? 'bg-rose-950/20 border-rose-900/50' : 'bg-slate-950 border-slate-800'
-                    }`}>
-                      <div className="flex items-center gap-4 flex-1">
-                        <button
-                          onClick={() => toggleHabitCompletion(habit.id)}
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
-                            isCompleted ? 'bg-rose-500 text-white scale-110' : 'bg-slate-800 text-slate-600 hover:bg-slate-700'
-                          }`}
-                          title="Click to log relapse (Penalty)"
-                        >
-                          <AlertCircle className="w-6 h-6" />
-                        </button>
-                        <div>
-                          <h3 className={`font-semibold text-lg ${isCompleted ? 'text-rose-300' : 'text-slate-100'}`}>{habit.title}</h3>
-                          <div className="flex gap-2 text-xs text-slate-500">
-                            <span className="bg-slate-900 px-2 py-0.5 rounded text-rose-400 font-bold">{habit.stat} -{habit.statReward}</span>
-                            <span className="bg-slate-900 px-2 py-0.5 rounded text-rose-400 font-bold">XP -{habit.xpReward}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <button onClick={() => deleteHabit(habit.id)} className="text-slate-600 hover:text-red-400 p-2">
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+             <HabitList 
+                type="good" 
+                habits={goodHabits} 
+                dateStr={dateStr}
+                onAdd={() => openAddModal('good')}
+                onDelete={deleteHabit}
+                onToggle={toggleHabitCompletion}
+             />
+             <HabitList 
+                type="bad" 
+                habits={badHabits} 
+                dateStr={dateStr}
+                onAdd={() => openAddModal('bad')}
+                onDelete={deleteHabit}
+                onToggle={toggleHabitCompletion}
+             />
           </div>
 
-          {/* Column 2: Gratitude */}
           <div className="space-y-8">
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
-              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <Heart className="w-5 h-5 text-amber-500" /> Gratitude Journal
-              </h2>
-              
-              <div className="mb-4">
-                {dailyGratitudes.map(entry => (
-                  <div key={entry.id} className="bg-amber-950/20 border border-amber-900/30 p-4 rounded-lg mb-3 flex justify-between items-start animate-in fade-in slide-in-from-bottom-2">
-                    <p className="text-amber-100 text-lg">{entry.content}</p>
-                    <button onClick={() => deleteGratitude(entry.id)} className="text-slate-600 hover:text-amber-500 transition-colors p-1">
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                ))}
-                {dailyGratitudes.length === 0 && (
-                  <p className="text-slate-500 text-sm italic mb-4">No gratitude entries for this day yet...</p>
-                )}
-              </div>
-
-              <div className="flex gap-2 mb-6">
-                <input 
-                  type="text" 
-                  value={gratitudeInput}
-                  onChange={(e) => setGratitudeInput(e.target.value)}
-                  placeholder="What are you grateful for today? (SOUL +1)"
-                  className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-amber-500 outline-none"
-                  onKeyDown={(e) => e.key === 'Enter' && addGratitude()}
-                />
-                <button 
-                  onClick={addGratitude}
-                  className="bg-amber-600 hover:bg-amber-500 text-white px-6 py-2 rounded-lg transition-colors flex items-center shadow-lg shadow-amber-500/20"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Collapsible History Section */}
-              <div className="border-t border-slate-800 pt-4">
-                <button 
-                  onClick={() => setShowGratitudeHistory(!showGratitudeHistory)}
-                  className="flex items-center gap-2 text-slate-400 hover:text-amber-400 transition-colors text-sm font-bold mb-4"
-                >
-                  {showGratitudeHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  History (Last 30)
-                </button>
-
-                {showGratitudeHistory && (
-                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                     {historyGratitudes.map(entry => (
-                        <div key={entry.id} className="text-sm border-b border-slate-800/50 pb-2 mb-2 last:border-0">
-                           <div className="text-slate-500 text-xs mb-1 flex justify-between">
-                              <span>{entry.date}</span>
-                              <button onClick={() => deleteGratitude(entry.id)} className="hover:text-red-400">
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                           </div>
-                           <p className="text-slate-300">{entry.content}</p>
-                        </div>
-                     ))}
-                     {historyGratitudes.length === 0 && <p className="text-slate-500 text-xs">No history yet.</p>}
-                  </div>
-                )}
-              </div>
-            </div>
+            <GratitudeSection 
+              logs={dailyGratitudes}
+              history={historyGratitudes}
+              onAdd={handleAddGratitude}
+              onDelete={handleDeleteGratitude}
+            />
           </div>
         </div>
       </main>

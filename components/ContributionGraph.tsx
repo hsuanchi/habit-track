@@ -13,23 +13,6 @@ import { twMerge } from 'tailwind-merge';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Habit, GratitudeEntry } from '../types';
 
-// Local implementations to resolve missing export errors
-const startOfMonth = (date: Date) => {
-  const d = new Date(date);
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-
-const startOfWeek = (date: Date) => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day;
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-
 interface ContributionGraphProps {
   habits: Habit[];
   gratitudeLogs?: GratitudeEntry[]; 
@@ -53,9 +36,14 @@ export const ContributionGraph: React.FC<ContributionGraphProps> = ({
   const handleNextMonth = () => setViewDate(addMonths(viewDate, 1));
 
   // Calculate range for the view
-  const monthStart = startOfMonth(viewDate);
+  // Manual startOfMonth implementation to avoid import issues
+  const monthStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
   const monthEnd = endOfMonth(viewDate);
-  const calendarStart = startOfWeek(monthStart);
+  
+  // Manual startOfWeek implementation (Sunday start)
+  const calendarStart = new Date(monthStart);
+  calendarStart.setDate(monthStart.getDate() - monthStart.getDay());
+  
   const calendarEnd = endOfWeek(monthEnd);
 
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
@@ -90,7 +78,6 @@ export const ContributionGraph: React.FC<ContributionGraphProps> = ({
         if (count >= 3) return 'bg-rose-500 hover:bg-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.4)]';
         return 'bg-rose-500';
     } else {
-        // Updated to use #ff6b35 (Orange) instead of Emerald
         if (count === 1) return 'bg-[#ff6b35]/30 hover:bg-[#ff6b35]/40';
         if (count === 2) return 'bg-[#ff6b35]/60 hover:bg-[#ff6b35]/70';
         if (count >= 3) return 'bg-[#ff6b35] hover:bg-[#ff8f66] shadow-[0_0_10px_rgba(255,107,53,0.4)]';
