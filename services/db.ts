@@ -18,28 +18,27 @@ const INITIAL_DATA: AppData = {
 };
 
 export class MockDB {
-  private static getKey(username: string) {
-    return `rpg_tracker_v3_${username}`; // Bumped version to v3 to reset schema cleanly for new stats
+  // Use unique User ID (uid) for the storage key to prevent collision
+  private static getKey(uid: string) {
+    return `rpg_tracker_v3_${uid}`; 
   }
 
-  static async login(username: string): Promise<AppData> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const key = this.getKey(username);
+  // Changed from login to loadData, no async delay needed for local storage
+  static loadData(uid: string): AppData {
+    const key = this.getKey(uid);
     const stored = localStorage.getItem(key);
     
     if (stored) {
       return JSON.parse(stored);
     }
     
-    // Create new user data
-    this.save(username, INITIAL_DATA);
+    // Create new user data if none exists
+    this.save(uid, INITIAL_DATA);
     return INITIAL_DATA;
   }
 
-  static save(username: string, data: AppData): void {
-    const key = this.getKey(username);
+  static save(uid: string, data: AppData): void {
+    const key = this.getKey(uid);
     localStorage.setItem(key, JSON.stringify(data));
   }
 }

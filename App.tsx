@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, LogOut, Calendar, BarChart2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { Habit, UserStats, StatType, STAT_LABELS, User, HabitType, GratitudeEntry } from './types';
 import { Login } from './components/Login';
 import { ContributionGraph } from './components/ContributionGraph';
 import { MockDB } from './services/db';
+import { auth } from './services/firebase';
 
 // Sub Components
 import { StatsOverview } from './components/StatsOverview';
@@ -14,6 +16,7 @@ import { WeeklyChart } from './components/WeeklyChart';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [firebaseUid, setFirebaseUid] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
   // Data State
@@ -37,45 +40,56 @@ const App: React.FC = () => {
   const [newHabitStat, setNewHabitStat] = useState<StatType>('BODY');
   const [newHabitType, setNewHabitType] = useState<HabitType>('good');
 
-  // Check for existing session
+  // Firebase Auth Listener
   useEffect(() => {
-    const savedUser = localStorage.getItem('rpg_current_user');
-    if (savedUser) {
-      handleLogin(savedUser);
-    } else {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        // User is signed in
+        const uid = firebaseUser.uid;
+        const displayName = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Adventurer';
+        
+        setFirebaseUid(uid);
+        setUser({ username: displayName, isLoggedIn: true });
+        
+        // Load data from LocalStorage using UID as key
+        const data = MockDB.loadData(uid);
+        
+        // Ensure habit types exist (migration helper)
+        const migratedHabits = data.habits.map(h => ({ ...h, type: h.type || 'good' }));
+        setHabits(migratedHabits);
+        setGratitudeLogs(data.gratitudeLogs || []);
+        setStats(data.stats);
+      } else {
+        // User is signed out
+        setUser(null);
+        setFirebaseUid(null);
+        setHabits([]);
+        setGratitudeLogs([]);
+        setStats({
+          level: 1, currentXp: 0, nextLevelXp: 100,
+          attributes: { BODY: 1, MIND: 1, SOUL: 1 }
+        });
+      }
       setLoading(false);
-    }
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const handleLogin = async (username: string) => {
-    setLoading(true);
-    const data = await MockDB.login(username);
-    const migratedHabits = data.habits.map(h => ({ ...h, type: h.type || 'good' }));
-    setHabits(migratedHabits);
-    setGratitudeLogs(data.gratitudeLogs || []);
-    setStats(data.stats);
-    setUser({ username, isLoggedIn: true });
-    localStorage.setItem('rpg_current_user', username);
-    setLoading(false);
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('rpg_current_user');
-    setHabits([]);
-    setGratitudeLogs([]);
-    setStats({
-      level: 1, currentXp: 0, nextLevelXp: 100,
-      attributes: { BODY: 1, MIND: 1, SOUL: 1 }
-    });
-  };
-
-  // Auto-save
-  useEffect(() => {
-    if (user) {
-      MockDB.save(user.username, { habits, gratitudeLogs, stats });
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out:", error);
     }
-  }, [habits, gratitudeLogs, stats, user]);
+  };
+
+  // Auto-save to LocalStorage whenever data changes
+  useEffect(() => {
+    if (firebaseUid) {
+      MockDB.save(firebaseUid, { habits, gratitudeLogs, stats });
+    }
+  }, [habits, gratitudeLogs, stats, firebaseUid]);
 
   const addHabit = () => {
     if (!newHabitTitle.trim()) return;
@@ -189,7 +203,7 @@ const App: React.FC = () => {
   }
 
   if (!user) {
-    return <Login onLogin={handleLogin} />;
+    return <Login />;
   }
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -218,6 +232,7 @@ const App: React.FC = () => {
             <button 
               onClick={handleLogout}
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors flex items-center gap-2"
+              title="Logout"
             >
               <LogOut className="w-5 h-5" />
             </button>
