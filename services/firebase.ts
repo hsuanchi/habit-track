@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 // ⚠️ IMPORTANT: Replace the object below with your own Firebase Config from the Firebase Console.
 // Go to Project Settings -> General -> Your apps -> SDK setup and configuration -> Config
@@ -15,3 +16,4 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app);

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, LogOut, Calendar, BarChart2 } from 'lucide-react';
+import { Trophy, LogOut, Calendar, BarChart2, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { Habit, UserStats, StatType, STAT_LABELS, User, HabitType, GratitudeEntry } from './types';
 import { Login } from './components/Login';
 import { ContributionGraph } from './components/ContributionGraph';
-import { MockDB } from './services/db';
+import { FirestoreDB } from './services/db';
 import { auth } from './services/firebase';
 
 // Sub Components
@@ -13,6 +13,8 @@ import { StatsOverview } from './components/StatsOverview';
 import { HabitList, STAT_ICONS } from './components/HabitList';
 import { GratitudeSection } from './components/GratitudeSection';
 import { WeeklyChart } from './components/WeeklyChart';
+
+const LOCAL_STORAGE_KEY = 'level_up_life_db'; // Key used by the previous local version
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -27,6 +29,10 @@ const App: React.FC = () => {
     attributes: { BODY: 1, MIND: 1, SOUL: 1 }
   });
 
+  // Data Loading State
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
   // UI State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -40,27 +46,64 @@ const App: React.FC = () => {
   const [newHabitStat, setNewHabitStat] = useState<StatType>('BODY');
   const [newHabitType, setNewHabitType] = useState<HabitType>('good');
 
-  // Firebase Auth Listener
+  // Firebase Auth Listener & Data Fetching
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // User is signed in
         const uid = firebaseUser.uid;
         const displayName = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Adventurer';
         
         setFirebaseUid(uid);
         setUser({ username: displayName, isLoggedIn: true });
         
-        // Load data from LocalStorage using UID as key
-        const data = MockDB.loadData(uid);
-        
-        // Ensure habit types exist (migration helper)
-        const migratedHabits = data.habits.map(h => ({ ...h, type: h.type || 'good' }));
-        setHabits(migratedHabits);
-        setGratitudeLogs(data.gratitudeLogs || []);
-        setStats(data.stats);
+        try {
+          let data = await FirestoreDB.fetchUserDocument(uid);
+          
+          // --- MIGRATION LOGIC: LocalStorage -> Firestore ---
+          // Check if there is local data and if the cloud data looks "empty" (fresh account)
+          const localDataJSON = localStorage.getItem(LOCAL_STORAGE_KEY);
+          const isCloudEmpty = (!data.habits || data.habits.length === 0) && (!data.gratitudeLogs || data.gratitudeLogs.length === 0) && data.stats.currentXp === 0;
+
+          if (localDataJSON && isCloudEmpty) {
+            try {
+              console.log("Found local data, migrating to cloud...");
+              const localData = JSON.parse(localDataJSON);
+              
+              // Validate minimal structure
+              if (localData.habits || localData.stats) {
+                // Merge local data into the object we will use
+                data = {
+                  habits: localData.habits || [],
+                  gratitudeLogs: localData.gratitudeLogs || [],
+                  stats: localData.stats || data.stats
+                };
+                
+                // Save to Firestore immediately
+                await FirestoreDB.updateUserDocument(uid, data);
+                
+                // Clear local storage so we don't migrate again
+                localStorage.removeItem(LOCAL_STORAGE_KEY);
+                alert("🎉 Previous local progress has been successfully synced to the cloud!");
+              }
+            } catch (err) {
+              console.error("Migration failed:", err);
+            }
+          }
+          // --------------------------------------------------
+
+          const migratedHabits = data.habits ? data.habits.map(h => ({ ...h, type: h.type || 'good' })) : [];
+          setHabits(migratedHabits);
+          setGratitudeLogs(data.gratitudeLogs || []);
+          setStats(data.stats || {
+            level: 1, currentXp: 0, nextLevelXp: 100,
+            attributes: { BODY: 1, MIND: 1, SOUL: 1 }
+          });
+          
+          setIsDataLoaded(true); 
+        } catch (error) {
+          console.error("Failed to load user data:", error);
+        }
       } else {
-        // User is signed out
         setUser(null);
         setFirebaseUid(null);
         setHabits([]);
@@ -69,6 +112,7 @@ const App: React.FC = () => {
           level: 1, currentXp: 0, nextLevelXp: 100,
           attributes: { BODY: 1, MIND: 1, SOUL: 1 }
         });
+        setIsDataLoaded(false);
       }
       setLoading(false);
     });
@@ -84,12 +128,24 @@ const App: React.FC = () => {
     }
   };
 
-  // Auto-save to LocalStorage whenever data changes
+  // Auto-save
   useEffect(() => {
-    if (firebaseUid) {
-      MockDB.save(firebaseUid, { habits, gratitudeLogs, stats });
-    }
-  }, [habits, gratitudeLogs, stats, firebaseUid]);
+    const saveData = async () => {
+      if (firebaseUid && isDataLoaded) {
+        setIsSaving(true);
+        try {
+          await FirestoreDB.updateUserDocument(firebaseUid, { habits, gratitudeLogs, stats });
+        } catch (error) {
+          console.error("Error saving data:", error);
+        } finally {
+          setIsSaving(false);
+        }
+      }
+    };
+
+    const timeoutId = setTimeout(saveData, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [habits, gratitudeLogs, stats, firebaseUid, isDataLoaded]);
 
   const addHabit = () => {
     if (!newHabitTitle.trim()) return;
@@ -216,7 +272,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-20">
       
       {/* Header */}
-      <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-30">
+      <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 backdrop-blur-md bg-opacity-90">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-[#ff6b35] rounded flex items-center justify-center shadow-lg shadow-[#ff6b35]/20">
@@ -226,9 +282,15 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-4">
+             {isSaving && (
+               <div className="flex items-center gap-1 text-xs text-[#ff6b35] animate-pulse">
+                 <Loader2 className="w-3 h-3 animate-spin" /> Saving...
+               </div>
+             )}
              <div className="text-sm text-slate-400 mr-2">
                 Hello, <span className="text-white font-semibold">{user.username}</span>
              </div>
+             
             <button 
               onClick={handleLogout}
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors flex items-center gap-2"
