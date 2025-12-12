@@ -19,284 +19,314 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <style>
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #1e293b; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
         
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        body { font-family: 'Inter', sans-serif; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        .fade-in { animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .hidden { display: none !important; }
+        
+        /* Modern Clean Card */
+        .clean-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        /* Tooltip for Heatmap */
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            white-space: nowrap;
+            z-index: 50;
+            pointer-events: none;
+            margin-bottom: 5px;
+            border: 1px solid #333;
+        }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 antialiased selection:bg-[#ff6b35] selection:text-white font-sans pb-20">
+<body class="bg-[#020617] text-slate-100 antialiased selection:bg-[#ff6b35] selection:text-white min-h-screen flex flex-col">
 
     <!-- Loading Overlay -->
-    <div id="loading-overlay" class="fixed inset-0 bg-slate-950 z-[100] flex flex-col items-center justify-center transition-opacity duration-500">
+    <div id="loading-overlay" class="fixed inset-0 bg-[#020617] z-[100] flex flex-col items-center justify-center transition-opacity duration-500">
         <div class="animate-spin text-[#ff6b35] mb-4">
             <i data-lucide="loader-2" class="w-10 h-10"></i>
         </div>
-        <p class="text-slate-500 animate-pulse">Summoning Interface...</p>
+        <p class="text-slate-500 animate-pulse font-medium tracking-wide text-xs uppercase">Loading System...</p>
     </div>
 
+    <!-- Fix for JS ID Reference -->
+    <span id="user-display-name" class="hidden"></span>
+
     <!-- Login Screen -->
-    <div id="login-screen" class="hidden min-h-screen flex items-center justify-center p-4">
-        <div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
-            <div class="absolute top-0 right-0 w-64 h-64 bg-[#ff6b35]/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-            
-            <div class="flex flex-col items-center mb-8 relative z-10">
-                <div class="w-16 h-16 bg-[#ff6b35] rounded-2xl flex items-center justify-center mb-4 transform rotate-3 shadow-[0_0_20px_rgba(255,107,53,0.5)]">
-                    <i data-lucide="sword" class="w-8 h-8 text-white"></i>
+    <div id="login-screen" class="hidden min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+        <div class="absolute inset-0 overflow-hidden">
+            <div class="absolute -top-[20%] -right-[10%] w-[600px] h-[600px] bg-[#ff6b35]/10 rounded-full blur-[120px]"></div>
+            <!-- Changed from indigo to rose for a warmer, more consistent background gradient -->
+            <div class="absolute -bottom-[20%] -left-[10%] w-[600px] h-[600px] bg-rose-500/10 rounded-full blur-[120px]"></div>
+        </div>
+
+        <div class="max-w-md w-full clean-card rounded-2xl p-8 relative z-10">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-[#ff6b35] to-orange-600 rounded-xl mb-4 shadow-lg shadow-orange-500/20">
+                    <i data-lucide="zap" class="w-8 h-8 text-white"></i>
                 </div>
-                <h1 class="text-3xl font-bold text-white tracking-tight">Level Up Life</h1>
-                <p id="auth-subtitle" class="text-slate-400 mt-2">Begin Your Journey</p>
+                <h1 class="text-3xl font-black text-white tracking-tight mb-2">Level Up Life</h1>
+                <p class="text-slate-400 text-sm">Turn your habits into an adventure.</p>
             </div>
 
             <div id="auth-error" class="hidden mb-6 bg-red-500/10 border border-red-500/20 text-red-200 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
-                <i data-lucide="alert-circle" class="w-4 h-4"></i> <span id="auth-error-text"></span>
+                <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i> <span id="auth-error-text"></span>
             </div>
 
-            <form id="auth-form" class="space-y-5 relative z-10" onsubmit="event.preventDefault()">
+            <form id="auth-form" class="space-y-4" onsubmit="event.preventDefault()">
                 <div id="username-field" class="hidden">
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Adventurer Name</label>
-                    <input type="text" id="input-username" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#ff6b35] outline-none" placeholder="Hero Name">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Hero Name</label>
+                    <input type="text" id="input-username" class="w-full bg-slate-950/50 border border-slate-700 rounded-xl p-3 text-white placeholder-slate-600 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35] outline-none transition-all" placeholder="Enter your name">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Email Scroll</label>
-                    <input type="email" id="input-email" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#ff6b35] outline-none" placeholder="name@example.com">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Email</label>
+                    <input type="email" id="input-email" required class="w-full bg-slate-950/50 border border-slate-700 rounded-xl p-3 text-white placeholder-slate-600 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35] outline-none transition-all" placeholder="name@example.com">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1.5">Secret Passphrase</label>
-                    <input type="password" id="input-password" required class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#ff6b35] outline-none" placeholder="••••••••">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Password</label>
+                    <input type="password" id="input-password" required class="w-full bg-slate-950/50 border border-slate-700 rounded-xl p-3 text-white placeholder-slate-600 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35] outline-none transition-all" placeholder="••••••••">
                 </div>
-                <button type="submit" id="btn-submit-auth" class="w-full bg-[#ff6b35] hover:bg-orange-500 text-white font-bold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#ff6b35]/20 mt-2">
-                    <i data-lucide="log-in" class="w-5 h-5"></i> <span id="btn-auth-text">Enter Realm</span>
+                <button type="submit" id="btn-submit-auth" class="w-full bg-[#ff6b35] hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-orange-500/20 mt-2">
+                    Start Journey
                 </button>
             </form>
 
-            <div class="mt-6 text-center">
-                <button id="btn-toggle-auth-mode" class="text-sm text-slate-400 hover:text-[#ff6b35] transition-colors">
-                    New to the realm? Create Account
+            <div class="mt-6 pt-6 border-t border-slate-800 flex justify-between items-center text-xs font-medium">
+                <button id="btn-toggle-auth-mode" class="text-slate-400 hover:text-[#ff6b35] transition-colors">
+                    Create new account
                 </button>
-                <div class="mt-4 pt-4 border-t border-slate-800">
-                    <button id="btn-offline-mode" class="text-xs text-slate-500 hover:text-slate-300">
-                        Play Offline (Local Save Only)
-                    </button>
-                </div>
+                <button id="btn-offline-mode" class="text-slate-600 hover:text-slate-300 transition-colors">
+                    Play Offline
+                </button>
             </div>
         </div>
     </div>
 
     <!-- Dashboard Screen -->
-    <div id="dashboard-screen" class="hidden">
+    <div id="dashboard-screen" class="hidden flex-1 flex flex-col">
+        
         <!-- Header -->
-        <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 backdrop-blur-md bg-opacity-90">
-            <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 bg-[#ff6b35] rounded flex items-center justify-center shadow-lg shadow-[#ff6b35]/20">
-                        <i data-lucide="trophy" class="w-4 h-4 text-white"></i>
+        <header class="clean-card border-b border-slate-800 sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+                
+                <!-- Brand -->
+                <div class="flex items-center gap-3 w-auto shrink-0">
+                    <div class="w-8 h-8 bg-[#ff6b35] rounded-lg flex items-center justify-center">
+                        <i data-lucide="activity" class="w-5 h-5 text-white"></i>
                     </div>
-                    <span class="font-bold text-lg tracking-wide hidden sm:inline">Level Up Life</span>
+                    <!-- Removed hidden sm:block -->
+                    <span class="font-bold text-lg text-white">Level Up Life</span>
                 </div>
-                <div class="flex items-center gap-4">
-                    <div id="saving-indicator" class="hidden flex items-center gap-1 text-xs text-[#ff6b35] animate-pulse">
-                        <i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Saving...
+
+                <!-- Spacer -->
+                <div class="flex-1"></div>
+
+                <!-- Simple Level & Stats -->
+                <div class="w-auto flex justify-end items-center gap-6">
+                     <div id="saving-indicator" class="hidden text-[#ff6b35] animate-pulse">
+                        <i data-lucide="save" class="w-4 h-4"></i>
                     </div>
-                    <div class="text-sm text-slate-400 mr-2">
-                        Hello, <span id="user-display-name" class="text-white font-semibold">Hero</span>
+
+                    <div class="flex items-center gap-6">
+                        <!-- Level / XP Simple -->
+                        <div class="flex flex-col items-end">
+                            <div class="flex items-baseline gap-1.5">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">LVL</span>
+                                <span id="top-level" class="text-xl font-black text-white leading-none">1</span>
+                            </div>
+                            <div class="w-24 h-1 bg-slate-800 rounded-full mt-1.5 overflow-hidden">
+                                <div id="top-xp-bar" class="h-full bg-[#ff6b35] rounded-full" style="width: 0%"></div>
+                            </div>
+                            <!-- XP Text (Subtle) -->
+                            <div class="text-[9px] font-medium text-slate-600 mt-0.5 opacity-80">
+                                <span id="top-xp-text">0/100</span> XP
+                            </div>
+                        </div>
+                        
+                        <!-- Logout (No Icon) -->
+                         <div class="flex items-center gap-2 pl-4 border-l border-slate-800/50">
+                            <button id="btn-logout" class="text-slate-500 hover:text-white transition-colors p-1" title="Logout">
+                                <i data-lucide="log-out" class="w-5 h-5"></i>
+                            </button>
+                        </div>
                     </div>
-                    <button id="btn-logout" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors" title="Logout">
-                        <i data-lucide="log-out" class="w-5 h-5"></i>
-                    </button>
                 </div>
             </div>
         </header>
 
-        <main class="max-w-7xl mx-auto px-4 py-8 space-y-8">
+        <main class="max-w-7xl mx-auto px-4 py-8 w-full flex-1">
             
-            <!-- Stats Overview -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <!-- Level Card -->
-                <div class="aspect-square bg-slate-900 rounded-2xl border border-slate-800 p-8 shadow-xl relative overflow-hidden flex flex-col items-center justify-center text-center">
-                    <div class="absolute top-0 right-0 w-64 h-64 bg-[#ff6b35]/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                    <div class="flex items-center gap-2 mb-6">
-                        <i data-lucide="sword" class="w-6 h-6 text-[#ff6b35]"></i>
-                        <h2 class="text-2xl font-bold text-white">Status</h2>
-                    </div>
-                    <div class="relative mb-8">
-                        <div class="w-32 h-32 bg-slate-950 rounded-full border-4 border-[#ff6b35]/30 flex items-center justify-center shadow-[0_0_30px_rgba(255,107,53,0.2)]">
-                            <span id="stat-level" class="text-6xl font-black text-white">1</span>
+            <!-- Grid Layout -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                
+                <!-- LEFT COLUMN: Attributes & Consistency -->
+                <div class="space-y-6">
+                    
+                    <!-- Attributes Card (Reduced min-height) -->
+                    <div class="clean-card rounded-2xl p-6 flex flex-col min-h-[300px]">
+                        <div class="flex items-center gap-2 mb-4">
+                             <i data-lucide="activity" class="w-5 h-5 text-[#ff6b35]"></i>
+                             <h3 class="text-lg font-bold text-white">Attributes</h3>
                         </div>
-                        <span class="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#ff6b35] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-lg">Level</span>
-                    </div>
-                    <div class="w-full max-w-xs space-y-2">
-                        <div class="flex justify-between text-xs font-mono text-[#ff6b35]/80 uppercase tracking-wider">
-                            <span>Experience</span>
-                            <span id="stat-xp-text">0 / 100</span>
-                        </div>
-                        <div class="w-full h-4 bg-slate-950 rounded-full overflow-hidden border border-slate-700/50">
-                            <div id="stat-xp-bar" class="h-full bg-gradient-to-r from-[#ff6b35] to-orange-400 transition-all duration-700 ease-out" style="width: 0%"></div>
+
+                        <!-- Chart -->
+                        <div class="relative w-full flex-1 flex items-center justify-center">
+                            <canvas id="radarChart"></canvas>
                         </div>
                     </div>
-                </div>
 
-                <!-- Attributes Radar -->
-                <div class="aspect-square bg-slate-900 rounded-2xl border border-slate-800 p-4 shadow-xl flex flex-col relative">
-                    <div class="absolute top-6 left-6 flex items-center gap-2 z-10">
-                        <i data-lucide="activity" class="w-5 h-5 text-[#ff6b35]"></i>
-                        <h3 class="text-lg font-bold text-slate-300">Attributes</h3>
-                    </div>
-                    <div class="flex-1 w-full h-full relative">
-                        <canvas id="radarChart"></canvas>
-                    </div>
-                    <div id="attributes-text" class="absolute bottom-6 w-full flex justify-center gap-6 text-sm font-mono text-slate-400">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- New Analytics Section -->
-            <div class="bg-slate-900 rounded-2xl border border-slate-800 p-8 shadow-xl">
-                <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-xl font-bold flex items-center gap-2 text-white">
-                        <i data-lucide="bar-chart-2" class="w-6 h-6 text-[#ff6b35]"></i>
-                        Performance Analytics
-                    </h2>
-                    <div class="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
-                        <button onclick="window.switchChart('week')" id="btn-chart-week" class="px-3 py-1 text-xs font-bold rounded bg-[#ff6b35] text-white transition-all">Weekly</button>
-                        <button onclick="window.switchChart('month')" id="btn-chart-month" class="px-3 py-1 text-xs font-bold rounded text-slate-400 hover:text-white transition-all">Monthly</button>
-                    </div>
-                </div>
-                <div class="w-full h-64">
-                    <canvas id="analyticsChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Dashboard Charts -->
-            <div class="bg-slate-900 rounded-2xl border border-slate-800 p-8 shadow-xl">
-                <div class="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
-                    <h2 class="text-xl font-bold flex items-center gap-2 text-white">
-                        <i data-lucide="calendar" class="w-6 h-6 text-[#ff6b35]"></i>
-                        Activity Log
-                    </h2>
-                    <div class="flex gap-4">
-                        <div class="flex gap-1 p-1 bg-slate-950 rounded-lg border border-slate-800">
-                            <button onclick="setDashboardView('positive')" id="btn-view-positive" class="px-3 py-1.5 rounded-md text-xs font-bold transition-all bg-[#ff6b35] text-white shadow">Good</button>
-                            <button onclick="setDashboardView('negative')" id="btn-view-negative" class="px-3 py-1.5 rounded-md text-xs font-bold transition-all text-slate-500 hover:text-slate-300">Bad</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Heatmap Container -->
-                <div id="heatmap-container" class="w-full overflow-x-auto pb-4">
-                    <!-- Date Navigation -->
-                    <div class="flex items-center justify-end mb-4 gap-4">
-                        <button id="btn-prev-month" class="p-1 hover:bg-slate-800 rounded text-slate-400"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
-                        <span id="heatmap-month-label" class="text-sm font-bold min-w-[100px] text-center text-slate-200">Date</span>
-                        <button id="btn-next-month" class="p-1 hover:bg-slate-800 rounded text-slate-400"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
-                    </div>
-                    <div id="heatmap-grid" class="flex gap-2 min-w-max justify-center">
-                        <!-- Grid generated by JS -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Date Display -->
-            <div id="selected-date-display" class="text-center text-3xl font-bold text-white mb-2 sticky top-16 z-20 bg-slate-950/90 backdrop-blur-md py-4 border-b border-slate-800/50 shadow-sm">
-                Today
-            </div>
-
-            <!-- Habits & Gratitude Grid -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div class="space-y-8">
-                    <!-- Good Habits -->
-                    <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl">
-                        <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                                <i data-lucide="zap" class="w-5 h-5 text-[#ff6b35]"></i> Good Habits
+                    <!-- Consistency Heatmap -->
+                    <div class="clean-card p-5 rounded-2xl relative">
+                        <div class="mb-4">
+                            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                                <i data-lucide="layout-grid" class="w-5 h-5 text-[#ff6b35]"></i>
+                                Consistency
                             </h2>
-                            <button onclick="openModal('good')" class="bg-[#ff6b35] hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1 shadow-lg">
-                                <i data-lucide="plus" class="w-4 h-4"></i> Add
-                            </button>
+                            <!-- Removed 4 Months History Text -->
                         </div>
-                        <div id="good-habits-list" class="space-y-3">
-                            <!-- Injected by JS -->
-                        </div>
-                    </div>
 
-                    <!-- Bad Habits -->
-                    <div class="bg-slate-900 rounded-2xl border border-rose-900/30 p-6 shadow-xl">
-                        <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                                <i data-lucide="skull" class="w-5 h-5 text-rose-400"></i> Bad Habits
-                            </h2>
-                            <button onclick="openModal('bad')" class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1 shadow-lg">
-                                <i data-lucide="plus" class="w-4 h-4"></i> Add
-                            </button>
-                        </div>
-                        <div id="bad-habits-list" class="space-y-3">
-                            <!-- Injected by JS -->
-                        </div>
-                    </div>
-                </div>
+                        <div class="space-y-6">
+                            <!-- Good Habits -->
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-[#ff6b35]"></span> Positive
+                                </h4>
+                                <div class="overflow-x-auto custom-scrollbar pb-2">
+                                    <div class="min-w-max flex gap-2">
+                                        <!-- Labels -->
+                                        <div class="flex flex-col justify-between py-[17px] pr-1 text-[9px] text-slate-500 font-bold h-[100px]">
+                                            <span>Mon</span><span>Wed</span><span>Fri</span>
+                                        </div>
+                                        <div class="flex-1">
+                                            <div id="heatmap-months-good" class="flex relative h-4 text-[9px] text-slate-500 font-bold mb-1"></div>
+                                            <div id="heatmap-grid-good" class="grid grid-rows-7 grid-flow-col gap-[3px] h-[81px]"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-                <!-- Gratitude Section -->
-                <div class="space-y-8">
-                    <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl relative overflow-hidden">
-                        <div class="absolute top-0 left-0 w-1 h-full bg-amber-500"></div>
-                        <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                            <i data-lucide="heart" class="w-5 h-5 text-amber-500"></i> Gratitude Journal
-                        </h2>
-                        <div id="gratitude-list" class="mb-4">
-                            <!-- Injected JS -->
-                        </div>
-                        <div class="flex gap-2 mb-6">
-                            <input type="text" id="gratitude-input" placeholder="What are you grateful for? (SOUL +1)" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-amber-500 outline-none">
-                            <button id="btn-add-gratitude" class="bg-amber-600 hover:bg-amber-500 text-white px-6 py-2 rounded-lg transition-colors flex items-center shadow-lg shadow-amber-500/20">
-                                <i data-lucide="send" class="w-5 h-5"></i>
-                            </button>
-                        </div>
-                        <div class="border-t border-slate-800 pt-4">
-                            <button onclick="toggleGratitudeHistory()" class="flex items-center gap-2 text-slate-400 hover:text-amber-400 transition-colors text-sm font-bold mb-4">
-                                History (Last 30)
-                            </button>
-                            <div id="gratitude-history" class="hidden space-y-2 max-h-[300px] overflow-y-auto pr-2">
-                                <!-- History injected JS -->
+                            <!-- Bad Habits -->
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-rose-500"></span> Negative
+                                </h4>
+                                <div class="overflow-x-auto custom-scrollbar pb-2">
+                                    <div class="min-w-max flex gap-2">
+                                        <!-- Labels -->
+                                        <div class="flex flex-col justify-between py-[17px] pr-1 text-[9px] text-slate-500 font-bold h-[100px]">
+                                            <span>Mon</span><span>Wed</span><span>Fri</span>
+                                        </div>
+                                        <div class="flex-1">
+                                            <div id="heatmap-months-bad" class="flex relative h-4 text-[9px] text-slate-500 font-bold mb-1"></div>
+                                            <div id="heatmap-grid-bad" class="grid grid-rows-7 grid-flow-col gap-[3px] h-[81px]"></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- RIGHT COLUMN: Habits List & Gratitude -->
+                <div class="lg:col-span-2 space-y-6">
+                    
+                    <!-- Habits List -->
+                    <div>
+                        <div class="flex items-center justify-between mb-4 px-1">
+                            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                                <i data-lucide="check-circle-2" class="w-4 h-4 text-[#ff6b35]"></i> Positive Habits
+                            </h3>
+                            <button onclick="openModal('good')" class="text-xs font-bold text-[#ff6b35] hover:bg-[#ff6b35] hover:text-white px-2 py-1 rounded transition-colors border border-[#ff6b35]/30 flex items-center gap-1">
+                                <i data-lucide="plus" class="w-3 h-3"></i> Add
+                            </button>
+                        </div>
+                        <div id="good-habits-list" class="space-y-3"></div>
+                    </div>
+
+                    <!-- Bad Habits List -->
+                    <div>
+                        <div class="flex items-center justify-between mb-4 px-1 mt-8">
+                            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                                <i data-lucide="x-circle" class="w-4 h-4 text-rose-500"></i> Negative Habits
+                            </h3>
+                            <button onclick="openModal('bad')" class="text-xs font-bold text-rose-500 hover:bg-rose-500 hover:text-white px-2 py-1 rounded transition-colors border border-rose-500/30 flex items-center gap-1">
+                                <i data-lucide="plus" class="w-3 h-3"></i> Add
+                            </button>
+                        </div>
+                        <div id="bad-habits-list" class="space-y-3"></div>
+                    </div>
+
+                     <!-- Gratitude Journal (Switched from Amber to Indigo) -->
+                     <div>
+                        <div class="flex items-center justify-between mb-4 px-1 mt-8">
+                            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                                <!-- Changed Icon Color -->
+                                <i data-lucide="book-open" class="w-4 h-4 text-indigo-400"></i> Daily Reflection
+                            </h3>
+                            <button onclick="toggleGratitudeHistory()" class="text-[10px] font-bold text-slate-500 hover:text-white transition-colors uppercase tracking-wider">
+                                History
+                            </button>
+                        </div>
+                        <!-- Changed Focus Border Color -->
+                        <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-2 flex gap-2 mb-3 focus-within:border-indigo-500/50 transition-colors">
+                             <input type="text" id="gratitude-input" placeholder="What are you grateful for today?" class="bg-transparent w-full text-sm text-white placeholder-slate-600 px-2 outline-none">
+                             <!-- Changed Button Color -->
+                             <button id="btn-add-gratitude" class="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg px-3 py-1.5 transition-colors">
+                                <i data-lucide="send" class="w-4 h-4"></i>
+                             </button>
+                        </div>
+                        <div id="gratitude-list" class="space-y-3"></div>
+                         <div id="gratitude-history" class="hidden mt-3 pt-3 border-t border-slate-800 space-y-2 max-h-[200px] overflow-y-auto"></div>
+                    </div>
+                </div>
+
             </div>
         </main>
     </div>
 
     <!-- Modal -->
-    <div id="habit-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <h3 id="modal-title" class="text-xl font-bold mb-4 text-white">Add Habit</h3>
-            <div class="space-y-4">
+    <div id="habit-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+        <div class="clean-card w-full max-w-md p-6 rounded-2xl shadow-2xl">
+            <h3 id="modal-title" class="text-xl font-bold mb-6 text-white flex items-center gap-2">Add Quest</h3>
+            <div class="space-y-5">
                 <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Title</label>
-                    <input type="text" id="modal-habit-title" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-[#ff6b35] outline-none" placeholder="Habit name">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Title</label>
+                    <input type="text" id="modal-habit-title" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:border-[#ff6b35] outline-none transition-all" placeholder="e.g. Read 10 mins">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Stat Type</label>
-                    <div class="grid grid-cols-3 gap-2" id="modal-stat-selector">
-                        <!-- Generated by JS -->
-                    </div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Attribute Reward</label>
+                    <div class="grid grid-cols-3 gap-2" id="modal-stat-selector"></div>
                 </div>
             </div>
-            <div class="flex gap-3 mt-8">
-                <button onclick="closeModal()" class="flex-1 py-2.5 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800">Cancel</button>
-                <button id="btn-save-habit" class="flex-1 py-2.5 rounded-lg text-white font-medium bg-[#ff6b35] hover:bg-orange-500 shadow-lg">Confirm</button>
+            <div class="flex gap-3 mt-8 pt-6 border-t border-slate-800">
+                <button onclick="closeModal()" class="flex-1 py-2.5 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 text-sm font-bold transition-colors">Cancel</button>
+                <button id="btn-save-habit" class="flex-1 py-2.5 rounded-lg text-white text-sm font-bold bg-[#ff6b35] hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/20">Create</button>
             </div>
         </div>
     </div>
 
     <script>
-        // --- 1. DEFINITIONS (Defined first so clicks work immediately) ---
-        
-        // Config
         const firebaseConfig = {
             apiKey: "AIzaSyA8TJUSbLBabNuW5RqAwWWOtxL-pZ4iOSc",
             authDomain: "habit-track-4e1c9.firebaseapp.com",
@@ -314,7 +344,6 @@
             SOUL: '<i data-lucide="heart" class="w-4 h-4"></i>' 
         };
 
-        // Global State
         let app, auth, db;
         let isOfflineMode = false;
         let state = {
@@ -325,32 +354,20 @@
             ui: {
                 selectedDate: new Date(),
                 viewDate: new Date(),
-                dashboardView: 'positive', 
                 modalType: 'good', 
-                selectedStat: 'BODY',
-                chartMode: 'week'
+                selectedStat: 'BODY'
             }
         };
         let radarChartInstance = null;
-        let analyticsChartInstance = null;
 
-        // Global Action Functions (Attached to Window for onClick)
         window.selectDate = (dateStr) => { state.ui.selectedDate = new Date(dateStr); renderAll(); };
-        window.switchChart = (mode) => { state.ui.chartMode = mode; renderAnalytics(); };
-        window.setDashboardView = (view) => {
-            state.ui.dashboardView = view;
-            updateViewButtons();
-            renderHeatmap();
-        };
         window.toggleHabit = (id) => {
             if(!window.dateFns) return;
             const habit = state.habits.find(h => h.id === id);
             if (!habit) return;
-            
             const dateStr = dateFns.format(state.ui.selectedDate, 'yyyy-MM-dd');
             const isCompleted = habit.completedDates.includes(dateStr);
             const mult = habit.type === 'good' ? 1 : -1;
-
             if (isCompleted) {
                 habit.completedDates = habit.completedDates.filter(d => d !== dateStr);
                 updateStats(-10 * mult, habit.stat, -1 * mult);
@@ -362,7 +379,7 @@
             saveData();
         };
         window.deleteHabit = (id) => {
-            if (confirm("Delete this habit?")) {
+            if (confirm("Delete this quest?")) {
                 state.habits = state.habits.filter(h => h.id !== id);
                 renderAll();
                 saveData();
@@ -380,195 +397,143 @@
         window.openModal = (type) => {
             state.ui.modalType = type;
             const modal = document.getElementById('habit-modal');
-            document.getElementById('modal-title').innerText = `Add ${type === 'good' ? 'Good' : 'Bad'} Habit`;
+            const titleEl = document.getElementById('modal-title');
+            const colorClass = type === 'good' ? 'text-[#ff6b35]' : 'text-rose-500';
+            titleEl.innerHTML = `<span class="${colorClass}">Add ${type === 'good' ? 'Positive' : 'Negative'} Habit</span>`;
             document.getElementById('modal-habit-title').value = '';
             document.getElementById('modal-habit-title').focus();
             document.getElementById('modal-stat-selector').innerHTML = Object.entries({BODY: 'Body', MIND: 'Mind', SOUL: 'Soul'}).map(([key, label]) => `
-                <button onclick="window.selectStat('${key}')" class="stat-btn p-2 text-sm rounded-lg border flex flex-col items-center gap-1 transition-all ${state.ui.selectedStat === key ? 'bg-[#ff6b35] border-[#ff6b35] text-white' : 'bg-slate-950 border-slate-700 text-slate-400'}">
-                    ${STAT_ICONS[key]} <span class="text-xs">${label}</span>
+                <button onclick="window.selectStat('${key}')" data-key="${key}" class="stat-btn p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${state.ui.selectedStat === key ? 'bg-white border-white text-slate-900 shadow-lg' : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500'}">
+                    ${STAT_ICONS[key]} <span class="text-[10px] font-bold uppercase">${label}</span>
                 </button>`).join('');
             modal.classList.remove('hidden');
+            safeCreateIcons();
         };
         window.selectStat = (key) => {
             state.ui.selectedStat = key;
             const btns = document.querySelectorAll('.stat-btn');
             btns.forEach(btn => {
-                if(btn.innerHTML.includes(STAT_ICONS[key])) btn.className = "stat-btn p-2 text-sm rounded-lg border flex flex-col items-center gap-1 transition-all bg-[#ff6b35] border-[#ff6b35] text-white";
-                else btn.className = "stat-btn p-2 text-sm rounded-lg border flex flex-col items-center gap-1 transition-all bg-slate-950 border-slate-700 text-slate-400";
+                if(btn.dataset.key === key) btn.className = "stat-btn p-3 rounded-xl border flex flex-col items-center gap-2 transition-all bg-white border-white text-slate-900 shadow-lg";
+                else btn.className = "stat-btn p-3 rounded-xl border flex flex-col items-center gap-2 transition-all bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500";
             });
         };
         window.closeModal = () => document.getElementById('habit-modal').classList.add('hidden');
 
-        // Internal Functions
-        function safeCreateIcons() {
-            if (window.lucide) window.lucide.createIcons();
-            else setTimeout(safeCreateIcons, 100);
-        }
-
-        function updateViewButtons() {
-            const view = state.ui.dashboardView;
-             const pBtn = document.getElementById('btn-view-positive');
-             const nBtn = document.getElementById('btn-view-negative');
-             if(pBtn) pBtn.className = view === 'positive' ? "px-3 py-1.5 rounded-md text-xs font-bold transition-all bg-[#ff6b35] text-white shadow" : "px-3 py-1.5 rounded-md text-xs font-bold transition-all text-slate-500 hover:text-slate-300";
-             if(nBtn) nBtn.className = view === 'negative' ? "px-3 py-1.5 rounded-md text-xs font-bold transition-all bg-rose-600 text-white shadow" : "px-3 py-1.5 rounded-md text-xs font-bold transition-all text-slate-500 hover:text-slate-300";
-        }
-
+        function safeCreateIcons() { if (window.lucide) window.lucide.createIcons(); else setTimeout(safeCreateIcons, 100); }
         function showScreen(screenName) {
-            const login = document.getElementById('login-screen');
-            const dashboard = document.getElementById('dashboard-screen');
-            const overlay = document.getElementById('loading-overlay');
-            
-            if(overlay) overlay.classList.add('hidden');
-            if(login) login.classList.add('hidden');
-            if(dashboard) dashboard.classList.add('hidden');
-
-            if (screenName === 'login') login.classList.remove('hidden');
-            if (screenName === 'dashboard') dashboard.classList.remove('hidden');
+            document.getElementById('loading-overlay').classList.add('hidden');
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('dashboard-screen').classList.add('hidden');
+            if (screenName === 'login') document.getElementById('login-screen').classList.remove('hidden');
+            if (screenName === 'dashboard') document.getElementById('dashboard-screen').classList.remove('hidden');
         }
-
         function addGratitude() {
             if(!window.dateFns) return;
             const input = document.getElementById('gratitude-input');
             const val = input.value.trim();
             if (!val) return;
-
             state.gratitudeLogs.unshift({ id: crypto.randomUUID(), date: dateFns.format(state.ui.selectedDate, 'yyyy-MM-dd'), content: val, createdAt: new Date().toISOString() });
             updateStats(5, 'SOUL', 1);
             input.value = '';
             renderAll();
             saveData();
         }
-
         function updateStats(xpChange, statKey, statChange) {
             let { level, currentXp, nextLevelXp, attributes } = state.stats;
             currentXp = Math.max(0, currentXp + xpChange);
             attributes[statKey] = Math.max(1, attributes[statKey] + statChange);
-
-            while (currentXp >= nextLevelXp) {
-                currentXp -= nextLevelXp;
-                level += 1;
-                nextLevelXp = Math.floor(nextLevelXp * 1.2);
-            }
+            while (currentXp >= nextLevelXp) { currentXp -= nextLevelXp; level += 1; nextLevelXp = Math.floor(nextLevelXp * 1.2); }
             state.stats = { level, currentXp, nextLevelXp, attributes };
             renderStats();
             saveData();
         }
 
-        // Render Functions
-        function renderAll() {
-            renderStats();
-            renderAnalytics();
-            renderDate();
-            renderHabits();
-            renderHeatmap();
-            renderGratitude();
-            safeCreateIcons();
-        }
-
+        function renderAll() { renderStats(); renderDate(); renderHabits(); renderHeatmap(); renderGratitude(); safeCreateIcons(); }
         function renderDate() {
-            if(window.dateFns) {
+            if(window.dateFns && document.getElementById('selected-date-display')) {
+                const isToday = dateFns.isSameDay(state.ui.selectedDate, new Date());
                 const fmt = dateFns.format(state.ui.selectedDate, 'MMMM d, yyyy');
-                document.getElementById('selected-date-display').innerText = fmt;
+                document.getElementById('selected-date-display').innerText = isToday ? 'Today' : fmt;
             }
         }
-
         function renderStats() {
             const { level, currentXp, nextLevelXp, attributes } = state.stats;
-            document.getElementById('stat-level').innerText = level;
-            document.getElementById('stat-xp-text').innerText = `${Math.floor(currentXp)} / ${nextLevelXp}`;
-            const pct = Math.min(100, (currentXp / nextLevelXp) * 100);
-            document.getElementById('stat-xp-bar').style.width = `${pct}%`;
+            // Update Header
+            const lvlEl = document.getElementById('top-level');
+            const xpTextEl = document.getElementById('top-xp-text');
+            const xpBarEl = document.getElementById('top-xp-bar');
+            
+            if(lvlEl) lvlEl.innerText = level;
+            if(xpTextEl) xpTextEl.innerText = `${Math.floor(currentXp)}/${nextLevelXp}`;
+            if(xpBarEl) {
+                const pct = Math.min(100, (currentXp / nextLevelXp) * 100);
+                xpBarEl.style.width = `${pct}%`;
+            }
 
-            const attrContainer = document.getElementById('attributes-text');
-            attrContainer.innerHTML = Object.entries(attributes).map(([k, v]) => `
-                <div class="flex flex-col items-center">
-                    <span class="text-xs text-[#ff6b35] font-bold">${k}</span>
-                    <span class="text-white font-bold text-lg">${v}</span>
-                </div>
-            `).join('');
-
+            // Update Stats Values in List
+            if(document.getElementById('val-body')) document.getElementById('val-body').innerText = attributes.BODY;
+            if(document.getElementById('val-mind')) document.getElementById('val-mind').innerText = attributes.MIND;
+            if(document.getElementById('val-soul')) document.getElementById('val-soul').innerText = attributes.SOUL;
+            
             const ctx = document.getElementById('radarChart');
-            // Chart.js safety check
-            if (typeof Chart === 'undefined') return;
-            
-            if (radarChartInstance) radarChartInstance.destroy();
-            radarChartInstance = new Chart(ctx, {
-                type: 'radar',
-                data: {
-                    labels: ['Body', 'Mind', 'Soul'],
-                    datasets: [{
-                        label: 'Stats',
-                        data: [attributes.BODY, attributes.MIND, attributes.SOUL],
-                        backgroundColor: 'rgba(255, 107, 53, 0.5)',
-                        borderColor: '#ff6b35',
-                        borderWidth: 2,
-                        pointBackgroundColor: '#fff'
-                    }]
-                },
-                options: {
-                    scales: {
-                        r: {
-                            angleLines: { color: '#334155' },
-                            grid: { color: '#334155' },
-                            pointLabels: { color: '#94a3b8', font: { size: 14, weight: 'bold' } },
-                            ticks: { display: false, backdropColor: 'transparent' },
-                            suggestedMin: 0
-                        }
+            if (typeof Chart !== 'undefined' && ctx) {
+                if (radarChartInstance) radarChartInstance.destroy();
+                radarChartInstance = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['Body', 'Mind', 'Soul'], 
+                        datasets: [{
+                            label: 'Stats',
+                            data: [attributes.BODY, attributes.MIND, attributes.SOUL],
+                            backgroundColor: 'rgba(255, 107, 53, 0.4)', // Slightly more transparent orange
+                            borderColor: '#ff6b35',
+                            borderWidth: 2,
+                            pointBackgroundColor: '#fff', // White point center
+                            pointBorderColor: '#ff6b35', // Orange border
+                            pointBorderWidth: 2,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        }]
                     },
-                    plugins: { legend: { display: false } },
-                    maintainAspectRatio: false
-                }
-            });
-        }
-
-        function renderAnalytics() {
-            if (typeof Chart === 'undefined' || !window.dateFns) return;
-            
-            const ctx = document.getElementById('analyticsChart');
-            if (analyticsChartInstance) analyticsChartInstance.destroy();
-
-            const isWeek = state.ui.chartMode === 'week';
-            const endDate = new Date();
-            const startDate = isWeek ? dateFns.subDays(endDate, 6) : dateFns.subDays(endDate, 29);
-            const interval = { start: startDate, end: endDate };
-            const days = dateFns.eachDayOfInterval(interval);
-
-            const labels = days.map(d => dateFns.format(d, isWeek ? 'EEE' : 'MMM d'));
-            const dataPoints = days.map(day => {
-                const dateStr = dateFns.format(day, 'yyyy-MM-dd');
-                return state.habits.filter(h => h.type === 'good' && h.completedDates.includes(dateStr)).length;
-            });
-
-            analyticsChartInstance = new Chart(ctx, {
-                type: isWeek ? 'bar' : 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Good Habits',
-                        data: dataPoints,
-                        backgroundColor: isWeek ? '#ff6b35' : 'rgba(255, 107, 53, 0.2)',
-                        borderColor: '#ff6b35',
-                        borderWidth: 2,
-                        borderRadius: 4,
-                        tension: 0.4,
-                        fill: !isWeek
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8', stepSize: 1 } },
-                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
-                    },
-                    plugins: { legend: { display: false } }
-                }
-            });
-
-            const weekBtn = document.getElementById('btn-chart-week');
-            const monthBtn = document.getElementById('btn-chart-month');
-            if(weekBtn) weekBtn.className = isWeek ? "px-3 py-1 text-xs font-bold rounded bg-[#ff6b35] text-white transition-all" : "px-3 py-1 text-xs font-bold rounded text-slate-400 hover:text-white transition-all";
-            if(monthBtn) monthBtn.className = !isWeek ? "px-3 py-1 text-xs font-bold rounded bg-[#ff6b35] text-white transition-all" : "px-3 py-1 text-xs font-bold rounded text-slate-400 hover:text-white transition-all";
+                    options: {
+                        layout: { padding: 5 }, // Reduced padding to maximize chart size
+                        scales: {
+                            r: {
+                                angleLines: { color: 'rgba(255, 255, 255, 0.05)' }, // Very subtle lines
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                pointLabels: { 
+                                    display: true,
+                                    color: '#94a3b8',
+                                    font: { size: 12, weight: '600', family: 'Inter' }, // Slightly smaller font
+                                    padding: 10
+                                },
+                                ticks: { display: false, backdropColor: 'transparent' },
+                                suggestedMin: 0
+                            }
+                        },
+                        plugins: { 
+                            legend: { display: false },
+                            tooltip: { 
+                                backgroundColor: '#1e293b',
+                                titleColor: '#fff',
+                                titleFont: { size: 14, weight: 'bold' },
+                                bodyColor: '#ff6b35',
+                                bodyFont: { weight: 'bold' },
+                                borderColor: 'rgba(255,255,255,0.1)',
+                                borderWidth: 1,
+                                padding: 12,
+                                displayColors: false,
+                                callbacks: {
+                                    title: (items) => items[0].label,
+                                    label: (context) => `Stats : ${context.raw}`
+                                }
+                            }
+                        },
+                        maintainAspectRatio: false,
+                        responsive: true
+                    }
+                });
+            }
         }
 
         function renderHabits() {
@@ -576,104 +541,108 @@
             const dateStr = dateFns.format(state.ui.selectedDate, 'yyyy-MM-dd');
             const goodList = document.getElementById('good-habits-list');
             const badList = document.getElementById('bad-habits-list');
-            
-            goodList.innerHTML = '';
-            badList.innerHTML = '';
+            goodList.innerHTML = ''; badList.innerHTML = '';
 
             const createHabitHTML = (habit) => {
                 const isGood = habit.type === 'good';
                 const isCompleted = habit.completedDates.includes(dateStr);
-                const color = isGood ? '#ff6b35' : '#e11d48'; 
+                const baseClass = "group flex items-center justify-between p-4 rounded-xl border transition-all duration-200 cursor-pointer";
+                // Reduced opacity from /20 to /10 for less visual noise
                 const bgClass = isCompleted 
-                    ? (isGood ? 'bg-[#ff6b35]/20 border-[#ff6b35]/50' : 'bg-rose-950/20 border-rose-900/50') 
-                    : 'bg-slate-950 border-slate-800';
-                const btnClass = isCompleted 
-                    ? (isGood ? 'bg-[#ff6b35] text-white scale-110' : 'bg-rose-500 text-white scale-110') 
-                    : 'bg-slate-800 text-slate-600 hover:bg-slate-700';
-
+                    ? (isGood ? 'bg-[#ff6b35]/10 border-[#ff6b35] shadow-lg shadow-orange-500/10' : 'bg-rose-500/10 border-rose-500 shadow-lg shadow-rose-500/10') 
+                    : 'bg-slate-900/50 border-slate-800 hover:border-slate-600 hover:bg-slate-800/50';
+                const textClass = isCompleted ? 'text-white' : 'text-slate-200';
+                const subTextClass = isCompleted ? 'text-white/80' : 'text-slate-500';
                 return `
-                <div class="flex items-center justify-between p-4 rounded-xl border transition-all ${bgClass} fade-in">
-                    <div class="flex items-center gap-4 flex-1">
-                        <button onclick="window.toggleHabit('${habit.id}')" class="w-12 h-12 rounded-xl flex items-center justify-center transition-all ${btnClass}">
-                            <i data-lucide="${isGood ? 'check' : 'alert-circle'}" class="w-6 h-6"></i>
-                        </button>
+                <div onclick="window.toggleHabit('${habit.id}')" class="${baseClass} ${bgClass} fade-in relative overflow-hidden">
+                    <div class="flex items-center gap-4 relative z-10">
+                        <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center ${isCompleted ? 'border-white bg-white/20' : 'border-slate-600 group-hover:border-slate-400'}">
+                            ${isCompleted ? '<i data-lucide="check" class="w-3.5 h-3.5 text-white"></i>' : ''}
+                        </div>
                         <div>
-                            <h3 class="font-semibold text-lg ${isCompleted ? 'text-slate-400' : 'text-slate-100'}">${habit.title}</h3>
-                            <div class="flex gap-2 text-xs text-slate-500 items-center mt-1">
-                                <span class="bg-slate-900 px-2 py-0.5 rounded font-bold flex items-center gap-1 text-[${color}]">
-                                    ${STAT_ICONS[habit.stat]} ${habit.stat} ${isGood ? '+' : '-'}${habit.statReward}
-                                </span>
-                                <span class="bg-slate-900 px-2 py-0.5 rounded font-bold ${isGood ? 'text-indigo-300' : 'text-rose-400'}">
-                                    XP ${isGood ? '+' : '-'}${habit.xpReward}
-                                </span>
+                            <h3 class="font-bold text-sm ${textClass} ${isCompleted ? 'line-through decoration-white/50' : ''}">${habit.title}</h3>
+                            <div class="flex gap-2 text-[10px] items-center ${subTextClass} font-medium mt-0.5">
+                                <span>${habit.stat} +${habit.statReward}</span>
+                                <span>•</span>
+                                <span>XP +${habit.xpReward}</span>
                             </div>
                         </div>
                     </div>
-                    <button onclick="window.deleteHabit('${habit.id}')" class="text-slate-600 hover:text-red-400 p-2">
-                        <i data-lucide="trash-2" class="w-5 h-5"></i>
-                    </button>
+                    <button onclick="event.stopPropagation(); window.deleteHabit('${habit.id}')" class="p-2 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity relative z-20"><i data-lucide="trash" class="w-4 h-4"></i></button>
                 </div>`;
             };
-
             state.habits.filter(h => h.type === 'good').forEach(h => goodList.innerHTML += createHabitHTML(h));
             state.habits.filter(h => h.type === 'bad').forEach(h => badList.innerHTML += createHabitHTML(h));
-            
-            if(goodList.innerHTML === '') goodList.innerHTML = '<p class="text-slate-500 text-center text-sm">No good habits yet.</p>';
-            if(badList.innerHTML === '') badList.innerHTML = '<p class="text-slate-500 text-center text-sm">No bad habits yet.</p>';
+            if(goodList.innerHTML === '') goodList.innerHTML = `<div class="text-center py-6 border-2 border-dashed border-slate-800/50 rounded-xl text-slate-600"><p class="text-xs">No active quests today.</p></div>`;
+            if(badList.innerHTML === '') badList.innerHTML = `<div class="text-center py-6 border-2 border-dashed border-slate-800/50 rounded-xl text-slate-600"><p class="text-xs">All clear.</p></div>`;
         }
 
         function renderHeatmap() {
             if(!window.dateFns) return;
-            const grid = document.getElementById('heatmap-grid');
-            const monthLabel = document.getElementById('heatmap-month-label');
-            const viewDate = state.ui.viewDate;
-            monthLabel.innerText = dateFns.format(viewDate, 'MMMM yyyy');
 
-            const monthStart = dateFns.startOfMonth(viewDate);
-            const monthEnd = dateFns.endOfMonth(viewDate);
-            const start = dateFns.startOfWeek(monthStart);
-            const end = dateFns.endOfWeek(monthEnd);
-            const days = dateFns.eachDayOfInterval({ start, end });
-            
-            const weeks = [];
-            let currentWeek = [];
-            days.forEach(day => {
-                currentWeek.push(day);
-                if (currentWeek.length === 7) { weeks.push(currentWeek); currentWeek = []; }
-            });
+            const renderGrid = (suffix, type) => {
+                const grid = document.getElementById(`heatmap-grid-${suffix}`);
+                const monthsContainer = document.getElementById(`heatmap-months-${suffix}`);
+                if(!grid || !monthsContainer) return;
+                
+                grid.innerHTML = '';
+                monthsContainer.innerHTML = '';
+                
+                const isPositive = type === 'good';
+                const activeHabits = state.habits.filter(h => h.type === type);
+                
+                const today = new Date();
+                const endOfCurrentMonth = dateFns.endOfMonth(today);
+                const endOfGrid = dateFns.endOfWeek(endOfCurrentMonth, { weekStartsOn: 1 });
+                const startDate = dateFns.subMonths(dateFns.startOfMonth(today), 3);
+                const startOfGrid = dateFns.startOfWeek(startDate, { weekStartsOn: 1 });
 
-            const isPositive = state.ui.dashboardView === 'positive';
-            const activeHabits = state.habits.filter(h => h.type === (isPositive ? 'good' : 'bad'));
-
-            let html = '';
-            weeks.forEach(week => {
-                html += '<div class="flex flex-col gap-2">';
-                week.forEach(day => {
+                const days = dateFns.eachDayOfInterval({ start: startOfGrid, end: endOfGrid });
+                const totalWeeks = Math.ceil(days.length / 7);
+                
+                let html = '';
+                let currentMonth = -1;
+                
+                days.forEach((day, index) => {
                     const dateStr = dateFns.format(day, 'yyyy-MM-dd');
-                    const isToday = dateFns.isSameDay(day, new Date());
+                    const isFuture = dateFns.isAfter(day, today);
+
+                    if(day.getMonth() !== currentMonth && day.getDay() === 1) { 
+                        currentMonth = day.getMonth();
+                        const weekIdx = Math.floor(index / 7);
+                        const leftPos = (weekIdx / totalWeeks) * 100;
+                        if(leftPos < 90) { 
+                           monthsContainer.innerHTML += `<div style="position:absolute; left:${leftPos}%">${dateFns.format(day, 'MMM')}</div>`;
+                        }
+                    }
+
                     const isSelected = dateFns.isSameDay(day, state.ui.selectedDate);
-                    const inMonth = dateFns.isSameMonth(day, viewDate);
                     
-                    let count = 0;
-                    activeHabits.forEach(h => { if(h.completedDates.includes(dateStr)) count++; });
-                    if(isPositive) count += state.gratitudeLogs.filter(g => g.date === dateStr).length;
+                    let colorClass = 'bg-[#1e293b]';
+                    if (isFuture) {
+                         colorClass = 'bg-[#0f172a]';
+                    } else {
+                        let count = 0;
+                        activeHabits.forEach(h => { if(h.completedDates.includes(dateStr)) count++; });
+                        if(isPositive) count += state.gratitudeLogs.filter(g => g.date === dateStr).length;
 
-                    let colorClass = 'bg-slate-800/50';
-                    if (count > 0) colorClass = isPositive 
-                        ? (count > 2 ? 'bg-[#ff6b35]' : count > 1 ? 'bg-[#ff6b35]/60' : 'bg-[#ff6b35]/30') 
-                        : (count > 2 ? 'bg-rose-500' : count > 1 ? 'bg-rose-700' : 'bg-rose-900');
+                        if (count > 0) {
+                            if (isPositive) colorClass = count > 2 ? 'bg-[#ff6b35]' : count > 1 ? 'bg-[#ff8c61]' : 'bg-[#ff8c61]/40';
+                            else colorClass = count > 2 ? 'bg-rose-600' : count > 1 ? 'bg-rose-500' : 'bg-rose-500/40';
+                        }
+                    }
+                    
+                    const border = isSelected ? 'ring-2 ring-white z-20' : 'border border-transparent hover:border-white/50';
+                    const cursor = isFuture ? 'cursor-default' : 'cursor-pointer';
+                    const clickEvent = isFuture ? '' : `onclick="window.selectDate('${dateStr}')"`;
 
-                    const opacity = inMonth ? 'opacity-100' : 'opacity-20 grayscale';
-                    const border = isSelected ? 'ring-2 ring-white scale-110 z-10' : (isToday ? 'border border-[#ff6b35]/80' : 'border border-transparent');
-
-                    html += `<div onclick="window.selectDate('${dateStr}')" 
-                             class="w-10 h-10 rounded-lg cursor-pointer transition-all flex items-center justify-center ${colorClass} ${opacity} ${border}">
-                             <span class="text-xs ${count > 0 ? 'text-white' : 'text-slate-600'}">${dateFns.format(day, 'd')}</span>
-                        </div>`;
+                    html += `<div ${clickEvent} data-tooltip="${isFuture ? '' : dateStr}" class="rounded-sm ${cursor} transition-all ${colorClass} ${border}"></div>`;
                 });
-                html += '</div>';
-            });
-            grid.innerHTML = html;
+                grid.innerHTML = html;
+            };
+
+            renderGrid('good', 'good');
+            renderGrid('bad', 'bad');
         }
 
         function renderGratitude() {
@@ -681,202 +650,75 @@
             const dateStr = dateFns.format(state.ui.selectedDate, 'yyyy-MM-dd');
             const container = document.getElementById('gratitude-list');
             const historyContainer = document.getElementById('gratitude-history');
-            
             const daily = state.gratitudeLogs.filter(g => g.date === dateStr);
             container.innerHTML = daily.map(entry => `
-                <div class="bg-amber-950/20 border border-amber-900/30 p-4 rounded-lg mb-3 flex justify-between items-start fade-in">
-                    <p class="text-amber-100">${entry.content}</p>
-                    <button onclick="window.deleteGratitude('${entry.id}')" class="text-slate-600 hover:text-amber-500 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                </div>
-            `).join('') || '<p class="text-slate-500 text-sm italic">No entries for this day.</p>';
-
+                <!-- Changed from amber to indigo -->
+                <div class="bg-indigo-500/5 border border-indigo-500/20 p-3 rounded-xl flex justify-between items-center group fade-in hover:border-indigo-500/40 transition-colors">
+                    <p class="text-indigo-100 text-xs font-medium truncate pr-2">${entry.content}</p>
+                    <button onclick="window.deleteGratitude('${entry.id}')" class="text-indigo-500/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="x" class="w-3 h-3"></i></button>
+                </div>`).join('');
+            if(daily.length === 0) container.innerHTML = `<div class="text-center py-4 border-2 border-dashed border-slate-800/50 rounded-xl text-slate-600"><p class="text-xs">No entries yet.</p></div>`;
             historyContainer.innerHTML = state.gratitudeLogs.slice(0, 30).map(entry => `
-                <div class="text-sm border-b border-slate-800/50 pb-2 mb-2">
-                    <div class="text-slate-500 text-xs mb-1 flex justify-between">
-                        <span>${entry.date}</span>
-                        <button onclick="window.deleteGratitude('${entry.id}')" class="hover:text-red-400"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                <div class="flex justify-between items-center text-[10px] text-slate-500 hover:text-slate-300 py-1.5 border-b border-slate-800/50 last:border-0 group">
+                    <div class="flex gap-2 truncate w-full">
+                        <span class="font-mono text-slate-600 shrink-0">${entry.date}</span>
+                        <span class="italic truncate">${entry.content}</span>
                     </div>
-                    <p class="text-slate-300">${entry.content}</p>
-                </div>
-            `).join('');
+                    <button onclick="window.deleteGratitude('${entry.id}')" class="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 ml-2"><i data-lucide="trash" class="w-3 h-3"></i></button>
+                </div>`).join('');
         }
 
-        // --- 2. INITIALIZATION (Run after DOM is ready) ---
         document.addEventListener('DOMContentLoaded', () => {
             safeCreateIcons();
-            
-            // Try initializing Firebase
-            try {
-                if (typeof firebase !== 'undefined') {
-                    app = firebase.initializeApp(firebaseConfig);
-                    auth = firebase.auth();
-                    db = firebase.firestore();
-                } else {
-                    console.warn("Firebase SDK not found. Offline Mode.");
-                    isOfflineMode = true;
-                }
-            } catch (e) {
-                console.error("Firebase Init Error:", e);
-                isOfflineMode = true;
-            }
+            try { if (typeof firebase !== 'undefined') { app = firebase.initializeApp(firebaseConfig); auth = firebase.auth(); db = firebase.firestore(); } else { isOfflineMode = true; } } catch (e) { isOfflineMode = true; }
 
-            // Button Listeners (For static elements)
             document.getElementById('btn-save-habit')?.addEventListener('click', () => {
                 const title = document.getElementById('modal-habit-title').value;
                 if (!title.trim()) return;
-                const newHabit = {
-                    id: crypto.randomUUID(),
-                    title,
-                    type: state.ui.modalType,
-                    stat: state.ui.selectedStat,
-                    xpReward: 10,
-                    statReward: 1,
-                    completedDates: [],
-                    streak: 0,
-                    createdAt: new Date().toISOString()
-                };
-                state.habits.push(newHabit);
-                saveData();
-                renderAll();
-                window.closeModal();
+                state.habits.push({ id: crypto.randomUUID(), title, type: state.ui.modalType, stat: state.ui.selectedStat, xpReward: 10, statReward: 1, completedDates: [], streak: 0, createdAt: new Date().toISOString() });
+                saveData(); renderAll(); window.closeModal();
             });
-
             document.getElementById('btn-add-gratitude')?.addEventListener('click', addGratitude);
             document.getElementById('gratitude-input')?.addEventListener('keydown', (e) => e.key === 'Enter' && addGratitude());
-            document.getElementById('btn-prev-month')?.addEventListener('click', () => {
-                if(window.dateFns) { state.ui.viewDate = dateFns.addMonths(state.ui.viewDate, -1); renderHeatmap(); }
-            });
-            document.getElementById('btn-next-month')?.addEventListener('click', () => {
-                if(window.dateFns) { state.ui.viewDate = dateFns.addMonths(state.ui.viewDate, 1); renderHeatmap(); }
-            });
-            document.getElementById('btn-logout')?.addEventListener('click', () => {
-                 if (isOfflineMode) {
-                    state.user = null;
-                    isOfflineMode = false; 
-                    showScreen('login');
-                    window.location.reload();
-                } else {
-                    auth.signOut();
-                }
-            });
-            document.getElementById('btn-offline-mode')?.addEventListener('click', () => {
-                isOfflineMode = true;
-                state.user = { uid: "offline_user", email: "offline@hero.com", displayName: "Offline Hero" };
-                document.getElementById('user-display-name').innerText = "Offline Hero";
-                loadUserData("offline_user"); 
-                showScreen('dashboard');
-            });
+            document.getElementById('btn-logout')?.addEventListener('click', () => { if (isOfflineMode) { state.user = null; isOfflineMode = false; showScreen('login'); window.location.reload(); } else { auth.signOut(); } });
+            document.getElementById('btn-offline-mode')?.addEventListener('click', () => { isOfflineMode = true; state.user = { uid: "offline_user", email: "offline@hero.com", displayName: "Offline Hero" }; document.getElementById('user-display-name').innerText = "Offline Hero"; loadUserData("offline_user"); showScreen('dashboard'); });
             
-            // Login Form
             const authForm = document.getElementById('auth-form');
             if(authForm) {
-                authForm.onsubmit = (e) => e.preventDefault();
                 authForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const email = document.getElementById('input-email').value;
                     const password = document.getElementById('input-password').value;
                     const username = document.getElementById('input-username').value;
                     const isRegistering = !document.getElementById('username-field').classList.contains('hidden');
-                    
-                    try {
-                        if (isRegistering) {
-                            const cred = await auth.createUserWithEmailAndPassword(email, password);
-                            if (cred.user) await cred.user.updateProfile({ displayName: username });
-                        } else {
-                            await auth.signInWithEmailAndPassword(email, password);
-                        }
-                    } catch (err) {
-                        alert(err.message);
-                    }
+                    try { if (isRegistering) { const cred = await auth.createUserWithEmailAndPassword(email, password); if (cred.user) await cred.user.updateProfile({ displayName: username }); } else { await auth.signInWithEmailAndPassword(email, password); } } catch (err) { alert(err.message); }
                 });
             }
-            
-            document.getElementById('btn-toggle-auth-mode')?.addEventListener('click', () => {
-                const userField = document.getElementById('username-field');
-                const isHidden = userField.classList.contains('hidden');
-                userField.classList.toggle('hidden');
-                document.getElementById('auth-subtitle').innerText = isHidden ? "Begin Your Journey" : "Continue Your Adventure";
-                document.getElementById('btn-auth-text').innerText = isHidden ? "Create Account" : "Enter Realm";
-                document.getElementById('btn-toggle-auth-mode').innerText = isHidden ? "Already have an account? Login" : "New to the realm? Create Account";
-            });
+            document.getElementById('btn-toggle-auth-mode')?.addEventListener('click', () => { const userField = document.getElementById('username-field'); const isHidden = userField.classList.contains('hidden'); userField.classList.toggle('hidden'); document.getElementById('btn-submit-auth').innerText = isHidden ? "Start Journey" : "Create Account"; document.getElementById('btn-toggle-auth-mode').innerText = isHidden ? "Create new account" : "Back to Login"; });
 
-            // Auth State Observer
-            if (!isOfflineMode && auth) {
-                auth.onAuthStateChanged(async (user) => {
-                    if (user) {
-                        state.user = user;
-                        document.getElementById('user-display-name').innerText = user.displayName || "Hero";
-                        await loadUserData(user.uid);
-                        showScreen('dashboard');
-                    } else {
-                        state.user = null;
-                        showScreen('login');
-                    }
-                });
-            }
-
-            // Failsafe: Remove loader after 1s
-            setTimeout(() => {
-                const overlay = document.getElementById('loading-overlay');
-                if(overlay) overlay.classList.add('hidden');
-                if(!state.user && document.getElementById('dashboard-screen').classList.contains('hidden')) {
-                     document.getElementById('login-screen').classList.remove('hidden');
-                }
-            }, 1500);
+            if (!isOfflineMode && auth) { auth.onAuthStateChanged(async (user) => { if (user) { state.user = user; document.getElementById('user-display-name').innerText = user.displayName || "Hero"; await loadUserData(user.uid); showScreen('dashboard'); } else { state.user = null; showScreen('login'); } }); }
+            setTimeout(() => { document.getElementById('loading-overlay').classList.add('hidden'); if(!state.user && document.getElementById('dashboard-screen').classList.contains('hidden')) { document.getElementById('login-screen').classList.remove('hidden'); } }, 1000);
         });
 
-        // --- 3. DATA PERSISTENCE ---
         async function loadUserData(uid) {
             let localData = null;
             try { localData = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)); } catch (e) {}
-
             if (!isOfflineMode && db) {
                 try {
-                    const docRef = db.collection('users').doc(uid);
-                    const docSnap = await docRef.get();
-                    if (docSnap.exists) {
-                        const data = docSnap.data();
-                        state.habits = (data.habits || []).map(h => ({...h, type: h.type || 'good'}));
-                        state.gratitudeLogs = data.gratitudeLogs || [];
-                        state.stats = data.stats || INITIAL_STATS;
-                    } else {
-                        state.habits = []; state.gratitudeLogs = []; state.stats = INITIAL_STATS;
-                         if(localData) {
-                             state.habits = localData.habits || [];
-                             state.gratitudeLogs = localData.gratitudeLogs || [];
-                             state.stats = localData.stats || INITIAL_STATS;
-                         }
-                         await docRef.set({ habits: state.habits, gratitudeLogs: state.gratitudeLogs, stats: state.stats }, { merge: true });
-                    }
-                } catch (e) {
-                    console.error("Cloud load error", e);
-                    if(localData) {
-                        state.habits = localData.habits || [];
-                        state.gratitudeLogs = localData.gratitudeLogs || [];
-                        state.stats = localData.stats || INITIAL_STATS;
-                    }
-                }
-            } else {
-                if(localData) {
-                    state.habits = localData.habits || [];
-                    state.gratitudeLogs = localData.gratitudeLogs || [];
-                    state.stats = localData.stats || INITIAL_STATS;
-                }
-            }
+                    const docSnap = await db.collection('users').doc(uid).get();
+                    if (docSnap.exists) { const data = docSnap.data(); state.habits = (data.habits || []).map(h => ({...h, type: h.type || 'good'})); state.gratitudeLogs = data.gratitudeLogs || []; state.stats = data.stats || INITIAL_STATS; } 
+                    else { if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.stats = localData.stats || INITIAL_STATS; } await db.collection('users').doc(uid).set({ habits: state.habits, gratitudeLogs: state.gratitudeLogs, stats: state.stats }, { merge: true }); }
+                } catch (e) { if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.stats = localData.stats || INITIAL_STATS; } }
+            } else if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.stats = localData.stats || INITIAL_STATS; }
             renderAll();
         }
-
         async function saveData() {
             const dataToSave = { habits: state.habits, gratitudeLogs: state.gratitudeLogs, stats: state.stats };
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
-
             if (!isOfflineMode && state.user && state.user.uid !== 'offline_user' && db) {
-                const indicator = document.getElementById('saving-indicator');
-                if(indicator) indicator.classList.remove('hidden');
-                try {
-                    await db.collection('users').doc(state.user.uid).set(dataToSave, { merge: true });
-                } catch (e) { console.error(e); }
-                finally { setTimeout(() => indicator && indicator.classList.add('hidden'), 500); }
+                document.getElementById('saving-indicator').classList.remove('hidden');
+                try { await db.collection('users').doc(state.user.uid).set(dataToSave, { merge: true }); } catch (e) { console.error(e); }
+                finally { setTimeout(() => document.getElementById('saving-indicator').classList.add('hidden'), 500); }
             }
         }
     </script>
