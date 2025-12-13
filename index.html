@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Level Up Life</title>
+    <!-- Favicon: Orange background with white lightning bolt -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23ff6b35'/%3E%3Cpath d='M55 20 L35 55 H50 L45 85 L65 45 H50 L55 20 Z' fill='white' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E" type="image/svg+xml">
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -58,6 +61,10 @@
             margin-bottom: 5px;
             border: 1px solid #333;
         }
+
+        /* Custom scrollbar for textarea */
+        textarea.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        textarea.custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
     </style>
 </head>
 <body class="bg-[#020617] text-slate-100 antialiased selection:bg-[#ff6b35] selection:text-white min-h-screen flex flex-col">
@@ -288,16 +295,16 @@
                                 History
                             </button>
                         </div>
-                        <!-- Changed Focus Border Color -->
-                        <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-2 flex gap-2 mb-3 focus-within:border-indigo-500/50 transition-colors">
-                             <input type="text" id="gratitude-input" placeholder="What are you grateful for today?" class="bg-transparent w-full text-sm text-white placeholder-slate-600 px-2 outline-none">
+                        <!-- Changed to Textarea for Shift+Enter support -->
+                        <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-2 flex gap-2 mb-3 focus-within:border-indigo-500/50 transition-colors items-start">
+                             <textarea id="gratitude-input" rows="1" placeholder="What are you grateful for today? (Shift+Enter to send)" class="bg-transparent w-full text-sm text-white placeholder-slate-600 px-2 outline-none resize-none py-1 custom-scrollbar"></textarea>
                              <!-- Changed Button Color -->
-                             <button id="btn-add-gratitude" class="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg px-3 py-1.5 transition-colors">
+                             <button id="btn-add-gratitude" class="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg px-3 py-1.5 transition-colors mt-0.5">
                                 <i data-lucide="send" class="w-4 h-4"></i>
                              </button>
                         </div>
-                        <div id="gratitude-list" class="space-y-3"></div>
-                         <div id="gratitude-history" class="hidden mt-3 pt-3 border-t border-slate-800 space-y-2 max-h-[200px] overflow-y-auto"></div>
+                        <!-- Removed Today's list, only rendering history when needed -->
+                        <div id="gratitude-history" class="hidden mt-3 pt-3 border-t border-slate-800 space-y-2 max-h-[300px] overflow-y-auto"></div>
                     </div>
                 </div>
 
@@ -553,6 +560,10 @@
                     : 'bg-slate-900/50 border-slate-800 hover:border-slate-600 hover:bg-slate-800/50';
                 const textClass = isCompleted ? 'text-white' : 'text-slate-200';
                 const subTextClass = isCompleted ? 'text-white/80' : 'text-slate-500';
+                
+                // Logic for negative habits display
+                const sign = isGood ? '+' : '-';
+                
                 return `
                 <div onclick="window.toggleHabit('${habit.id}')" class="${baseClass} ${bgClass} fade-in relative overflow-hidden">
                     <div class="flex items-center gap-4 relative z-10">
@@ -562,9 +573,9 @@
                         <div>
                             <h3 class="font-bold text-sm ${textClass} ${isCompleted ? 'line-through decoration-white/50' : ''}">${habit.title}</h3>
                             <div class="flex gap-2 text-[10px] items-center ${subTextClass} font-medium mt-0.5">
-                                <span>${habit.stat} +${habit.statReward}</span>
+                                <span>${habit.stat} ${sign}${habit.statReward}</span>
                                 <span>•</span>
-                                <span>XP +${habit.xpReward}</span>
+                                <span>XP ${sign}${habit.xpReward}</span>
                             </div>
                         </div>
                     </div>
@@ -646,26 +657,23 @@
         }
 
         function renderGratitude() {
-            if(!window.dateFns) return;
-            const dateStr = dateFns.format(state.ui.selectedDate, 'yyyy-MM-dd');
-            const container = document.getElementById('gratitude-list');
             const historyContainer = document.getElementById('gratitude-history');
-            const daily = state.gratitudeLogs.filter(g => g.date === dateStr);
-            container.innerHTML = daily.map(entry => `
-                <!-- Changed from amber to indigo -->
-                <div class="bg-indigo-500/5 border border-indigo-500/20 p-3 rounded-xl flex justify-between items-center group fade-in hover:border-indigo-500/40 transition-colors">
-                    <p class="text-indigo-100 text-xs font-medium truncate pr-2">${entry.content}</p>
-                    <button onclick="window.deleteGratitude('${entry.id}')" class="text-indigo-500/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="x" class="w-3 h-3"></i></button>
-                </div>`).join('');
-            if(daily.length === 0) container.innerHTML = `<div class="text-center py-4 border-2 border-dashed border-slate-800/50 rounded-xl text-slate-600"><p class="text-xs">No entries yet.</p></div>`;
+            if(!historyContainer) return;
+            
             historyContainer.innerHTML = state.gratitudeLogs.slice(0, 30).map(entry => `
-                <div class="flex justify-between items-center text-[10px] text-slate-500 hover:text-slate-300 py-1.5 border-b border-slate-800/50 last:border-0 group">
-                    <div class="flex gap-2 truncate w-full">
-                        <span class="font-mono text-slate-600 shrink-0">${entry.date}</span>
-                        <span class="italic truncate">${entry.content}</span>
+                <div class="bg-indigo-500/5 border border-indigo-500/20 p-3 rounded-xl flex justify-between items-center group fade-in hover:border-indigo-500/40 transition-colors">
+                    <div class="flex flex-col gap-0.5 overflow-hidden">
+                        <span class="text-[10px] font-mono text-slate-500">${entry.date}</span>
+                        <p class="text-indigo-100 text-xs font-medium break-words">${entry.content}</p>
                     </div>
-                    <button onclick="window.deleteGratitude('${entry.id}')" class="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 ml-2"><i data-lucide="trash" class="w-3 h-3"></i></button>
+                    <button onclick="event.stopPropagation(); window.deleteGratitude('${entry.id}')" class="text-indigo-500/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-2 -mr-2 flex-shrink-0">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
                 </div>`).join('');
+                
+             if(state.gratitudeLogs.length === 0) {
+                 historyContainer.innerHTML = `<div class="text-center py-4 border-2 border-dashed border-slate-800/50 rounded-xl text-slate-600"><p class="text-xs">No entries yet.</p></div>`;
+             }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -679,7 +687,13 @@
                 saveData(); renderAll(); window.closeModal();
             });
             document.getElementById('btn-add-gratitude')?.addEventListener('click', addGratitude);
-            document.getElementById('gratitude-input')?.addEventListener('keydown', (e) => e.key === 'Enter' && addGratitude());
+            document.getElementById('gratitude-input')?.addEventListener('keydown', (e) => {
+                // Change to Shift+Enter to submit
+                if (e.key === 'Enter' && e.shiftKey) {
+                    e.preventDefault();
+                    addGratitude();
+                }
+            });
             document.getElementById('btn-logout')?.addEventListener('click', () => { if (isOfflineMode) { state.user = null; isOfflineMode = false; showScreen('login'); window.location.reload(); } else { auth.signOut(); } });
             document.getElementById('btn-offline-mode')?.addEventListener('click', () => { isOfflineMode = true; state.user = { uid: "offline_user", email: "offline@hero.com", displayName: "Offline Hero" }; document.getElementById('user-display-name').innerText = "Offline Hero"; loadUserData("offline_user"); showScreen('dashboard'); });
             
