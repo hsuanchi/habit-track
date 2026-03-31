@@ -340,6 +340,18 @@
             <div id="view-tasks" class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8 items-start w-full flex-1" style="display: grid;">
                 <!-- Left: FullCalendar -->
                 <div class="lg:col-span-2 clean-card rounded-2xl p-2 sm:p-6 min-h-[500px] flex flex-col h-full relative">
+                    <!-- Custom Calendar Toolbar -->
+                    <div class="flex items-center justify-between mb-4 px-2 sm:px-0">
+                        <div class="flex items-center gap-1 bg-slate-900/50 p-1 rounded-lg border border-slate-800">
+                            <button onclick="calendarInstance.prev()" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                            <button onclick="calendarInstance.next()" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                        </div>
+                        <div class="flex items-center gap-1 bg-slate-900/50 p-1 rounded-lg border border-slate-800" id="custom-cal-views">
+                            <button onclick="window.changeCalView('dayGridMonth')" class="cal-view-btn px-3 py-1 text-xs font-bold rounded-md text-slate-400 hover:text-white transition-colors" data-view="dayGridMonth">Month</button>
+                            <button onclick="window.changeCalView('timeGridWeek')" class="cal-view-btn px-3 py-1 text-xs font-bold rounded-md bg-[#ff6b35]/20 text-[#ff6b35] transition-colors" data-view="timeGridWeek">Week</button>
+                            <button onclick="window.changeCalView('timeGridDay')" class="cal-view-btn px-3 py-1 text-xs font-bold rounded-md text-slate-400 hover:text-white transition-colors" data-view="timeGridDay">Day</button>
+                        </div>
+                    </div>
                     <div id="calendar" class="flex-1 w-full h-full text-slate-300 mt-2"></div>
                 </div>
                 
@@ -391,7 +403,8 @@
                                     <div>
                                         <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Date</label>
                                         <div class="flex gap-2 items-center flex-wrap" id="task-date-btns">
-                                            <button type="button" data-date="today" class="date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35] transition-colors">Today</button>
+                                            <button type="button" data-date="none" class="date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35] transition-colors">No Date</button>
+                                            <button type="button" data-date="today" class="date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-slate-700 text-slate-400 hover:text-white transition-colors">Today</button>
                                             <button type="button" data-date="tomorrow" class="date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-slate-700 text-slate-400 hover:text-white transition-colors">Tomorrow</button>
                                             <input type="date" id="new-task-date-picker" class="bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white outline-none focus:border-slate-600 w-full sm:w-auto sm:ml-auto mt-2 sm:mt-0">
                                         </div>
@@ -614,7 +627,7 @@
                 notes: notes.trim(),
                 source: source.trim(),
                 difficulty: difficulty,
-                date: date || state.ui.newTaskDate || dateFns.format(new Date(), 'yyyy-MM-dd'),
+                date: date !== null && date !== undefined ? date : (state.ui.newTaskDate || ''),
                 type: type,
                 startTime: startTime,
                 endTime: endTime,
@@ -739,7 +752,7 @@
         
         function updateCalendarEvents() {
             if (!calendarInstance) return;
-            const events = state.tasks.map(t => {
+            const events = state.tasks.filter(t => t.date).map(t => {
                 const isMeeting = t.type === 'meeting';
                 const hasTime = isMeeting && t.startTime;
                 
@@ -759,9 +772,9 @@
                     start: start,
                     end: end,
                     allDay: !hasTime,
-                    backgroundColor: t.completed ? '#334155' : (isMeeting ? 'rgba(15, 23, 42, 0.6)' : '#2563eb'),
+                    backgroundColor: t.completed ? '#334155' : (isMeeting ? 'transparent' : '#2563eb'),
                     textColor: t.completed ? '#94a3b8' : (isMeeting ? '#f8fafc' : '#ffffff'),
-                    borderColor: t.completed ? 'transparent' : (isMeeting ? 'rgba(255, 255, 255, 0.08)' : 'transparent'),
+                    borderColor: t.completed ? 'transparent' : 'transparent',
                     extendedProps: {
                         isMeeting: isMeeting,
                         completed: t.completed,
@@ -775,17 +788,26 @@
             calendarInstance.addEventSource(events);
         }
 
+        window.changeCalView = (viewName) => {
+            if(calendarInstance) {
+                calendarInstance.changeView(viewName);
+                document.querySelectorAll('.cal-view-btn').forEach(btn => {
+                    if(btn.dataset.view === viewName) {
+                        btn.className = 'cal-view-btn px-3 py-1 text-xs font-bold rounded-md bg-[#ff6b35]/20 text-[#ff6b35] transition-colors';
+                    } else {
+                        btn.className = 'cal-view-btn px-3 py-1 text-xs font-bold rounded-md text-slate-400 hover:text-white transition-colors';
+                    }
+                });
+            }
+        };
+
         function initCalendar() {
             const calendarEl = document.getElementById('calendar');
             if (calendarEl && window.FullCalendar) {
                 calendarInstance = new FullCalendar.Calendar(calendarEl, {
                     initialView: 'timeGridWeek',
                     scrollTime: '11:00:00',
-                    headerToolbar: {
-                        left: 'prev,next today',
-                        center: 'title',
-                        right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                    },
+                    headerToolbar: false,
                     height: '100%',
                     events: [],
                     editable: true, // Enable drag and drop
@@ -935,9 +957,15 @@
                             <h4 class="text-sm font-medium ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-200'} truncate">${task.title}</h4>
                         </div>
                         <div class="flex items-center gap-2 flex-shrink-0">
+                            ${task.date ? `
                             <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
                                 ${isMeeting && task.startTime ? `${task.date} ${task.startTime}` : task.date}
                             </span>
+                            ` : `
+                            <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-800/50 text-slate-500 border border-slate-700/50">
+                                No Date
+                            </span>
+                            `}
                         </div>
                     </div>
                 `;
@@ -1001,7 +1029,9 @@
             // Sort tasks: incomplete first, then by date, and filter out meetings
             const sortedTasks = [...state.tasks].filter(t => t.type !== 'meeting').sort((a, b) => {
                 if (a.completed !== b.completed) return a.completed ? 1 : -1;
-                return new Date(a.date) - new Date(b.date);
+                const dateA = a.date ? new Date(a.date).getTime() : Infinity;
+                const dateB = b.date ? new Date(b.date).getTime() : Infinity;
+                return dateA - dateB;
             });
 
             sortedTasks.forEach(task => {
@@ -1294,7 +1324,10 @@
                     e.target.className = `date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35] transition-colors`;
                     
                     const type = e.target.dataset.date;
-                    if (type === 'today') {
+                    if (type === 'none') {
+                        datePicker.value = '';
+                        state.ui.newTaskDate = '';
+                    } else if (type === 'today') {
                         datePicker.value = dateFns.format(new Date(), 'yyyy-MM-dd');
                     } else if (type === 'tomorrow') {
                         datePicker.value = dateFns.format(dateFns.addDays(new Date(), 1), 'yyyy-MM-dd');
@@ -1302,9 +1335,9 @@
                 });
             });
 
-            // Initialize date picker with today if not set
-            if (!datePicker.value) {
-                datePicker.value = dateFns.format(new Date(), 'yyyy-MM-dd');
+            // Initialize date picker with empty if not set
+            if (!datePicker.value && !document.querySelector('#task-date-btns .date-btn[data-date="none"]').classList.contains('bg-[#ff6b35]/10')) {
+                datePicker.value = '';
             }
             
             datePicker.addEventListener('change', () => {
@@ -1333,7 +1366,10 @@
             const activeDiffBtn = document.querySelector('#task-difficulty-btns .diff-btn[data-active="true"]');
             if (activeDiffBtn) difficulty = activeDiffBtn.dataset.diff;
 
-            const date = document.getElementById('new-task-date-picker')?.value || state.ui.newTaskDate || dateFns.format(new Date(), 'yyyy-MM-dd');
+            let date = document.getElementById('new-task-date-picker')?.value;
+            if (date === undefined || date === null || date === '') {
+                date = state.ui.newTaskDate || '';
+            }
             
             const notes = document.getElementById('new-task-notes')?.value || '';
 
