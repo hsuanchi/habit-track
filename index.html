@@ -56,6 +56,12 @@
         .fc-daygrid-day-number { color: #cbd5e1 !important; }
         .fc-event { border-width: 1px !important; border-style: solid !important; border-radius: 4px !important; padding: 2px 4px !important; font-size: 0.75rem !important; font-weight: 600 !important; }
         .fc-toolbar-title { color: #f8fafc !important; font-size: 1.25rem !important; font-weight: 700 !important; }
+        .fc-toolbar { flex-wrap: wrap; gap: 8px; justify-content: center !important; }
+        .fc-toolbar-chunk { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+        @media (max-width: 640px) {
+            .fc-toolbar-title { font-size: 1rem !important; }
+            .fc-header-toolbar { flex-direction: column; gap: 12px; }
+        }
         
         /* Tooltip for Heatmap */
         [data-tooltip]:hover::after {
@@ -162,8 +168,8 @@
 
                 <!-- Navigation Tabs -->
                 <div class="flex items-center gap-1 sm:gap-2 bg-slate-900/50 p-1 rounded-lg border border-slate-800 shrink-0 order-3 sm:order-none w-full sm:w-auto justify-center mt-2 sm:mt-0">
-                    <button id="nav-habits" onclick="switchTab('habits')" class="px-4 sm:px-4 py-1.5 rounded-md text-sm font-bold bg-[#ff6b35] text-white shadow-sm transition-all flex-1 sm:flex-none">Habits</button>
-                    <button id="nav-tasks" onclick="switchTab('tasks')" class="px-4 sm:px-4 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white transition-all flex-1 sm:flex-none">TaskFlow</button>
+                    <button id="nav-habits" onclick="switchTab('habits')" class="px-4 sm:px-4 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white transition-all flex-1 sm:flex-none">Habits</button>
+                    <button id="nav-tasks" onclick="switchTab('tasks')" class="px-4 sm:px-4 py-1.5 rounded-md text-sm font-bold bg-[#ff6b35] text-white shadow-sm transition-all flex-1 sm:flex-none">TaskFlow</button>
                 </div>
 
                 <!-- Spacer -->
@@ -202,10 +208,10 @@
             </div>
         </header>
 
-        <main class="max-w-7xl mx-auto px-4 py-8 w-full flex-1 flex flex-col">
+        <main class="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-8 w-full flex-1 flex flex-col">
             
             <!-- Habits View -->
-            <div id="view-habits" class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start w-full">
+            <div id="view-habits" class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8 items-start w-full" style="display: none;">
                 
                 <!-- LEFT COLUMN: Attributes & Consistency -->
                 <div class="space-y-6">
@@ -331,15 +337,15 @@
             </div>
 
             <!-- Tasks View -->
-            <div id="view-tasks" class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start w-full flex-1" style="display: none;">
+            <div id="view-tasks" class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8 items-start w-full flex-1" style="display: grid;">
                 <!-- Left: FullCalendar -->
-                <div class="lg:col-span-2 clean-card rounded-2xl p-6 min-h-[500px] flex flex-col h-full relative">
+                <div class="lg:col-span-2 clean-card rounded-2xl p-2 sm:p-6 min-h-[500px] flex flex-col h-full relative">
                     <div id="calendar" class="flex-1 w-full h-full text-slate-300 mt-2"></div>
                 </div>
                 
                 <!-- Right: Task List -->
                 <div class="space-y-6 flex flex-col h-full">
-                    <div class="clean-card rounded-2xl p-6 flex flex-col flex-1 max-h-[800px]">
+                    <div class="clean-card rounded-2xl p-3 sm:p-6 flex flex-col flex-1 max-h-[800px]">
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-lg font-bold text-white flex items-center gap-2">
                                 <i data-lucide="list-todo" class="w-5 h-5 text-[#ff6b35]"></i> Tasks
@@ -387,7 +393,7 @@
                                         <div class="flex gap-2 items-center flex-wrap" id="task-date-btns">
                                             <button type="button" data-date="today" class="date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35] transition-colors">Today</button>
                                             <button type="button" data-date="tomorrow" class="date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-slate-700 text-slate-400 hover:text-white transition-colors">Tomorrow</button>
-                                            <input type="date" id="new-task-date-picker" class="bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white outline-none focus:border-slate-600 ml-auto">
+                                            <input type="date" id="new-task-date-picker" class="bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white outline-none focus:border-slate-600 w-full sm:w-auto sm:ml-auto mt-2 sm:mt-0">
                                         </div>
                                     </div>
 
@@ -530,7 +536,7 @@
                 viewDate: new Date(),
                 modalType: 'good', 
                 selectedStat: 'BODY',
-                currentTab: 'habits',
+                currentTab: 'tasks',
                 expandedTaskId: null,
                 showCompletedTasks: false
             }
@@ -753,9 +759,9 @@
                     start: start,
                     end: end,
                     allDay: !hasTime,
-                    backgroundColor: t.completed ? '#334155' : (isMeeting ? 'rgba(249, 115, 22, 0.2)' : '#2563eb'),
-                    textColor: t.completed ? '#94a3b8' : (isMeeting ? '#ffedd5' : '#ffffff'),
-                    borderColor: t.completed ? 'transparent' : (isMeeting ? '#f97316' : 'transparent'),
+                    backgroundColor: t.completed ? '#334155' : (isMeeting ? 'rgba(15, 23, 42, 0.6)' : '#2563eb'),
+                    textColor: t.completed ? '#94a3b8' : (isMeeting ? '#f8fafc' : '#ffffff'),
+                    borderColor: t.completed ? 'transparent' : (isMeeting ? 'rgba(255, 255, 255, 0.08)' : 'transparent'),
                     extendedProps: {
                         isMeeting: isMeeting,
                         completed: t.completed,
@@ -773,7 +779,8 @@
             const calendarEl = document.getElementById('calendar');
             if (calendarEl && window.FullCalendar) {
                 calendarInstance = new FullCalendar.Calendar(calendarEl, {
-                    initialView: 'dayGridMonth',
+                    initialView: 'timeGridWeek',
+                    scrollTime: '11:00:00',
                     headerToolbar: {
                         left: 'prev,next today',
                         center: 'title',
@@ -954,9 +961,9 @@
                             ${isMeeting ? `
                             <div>
                                 <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Time</label>
-                                <div class="flex gap-2 items-center">
+                                <div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
                                     <input type="time" value="${task.startTime || ''}" onchange="window.updateTask('${task.id}', 'startTime', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
-                                    <span class="text-slate-500 text-xs">to</span>
+                                    <span class="text-slate-500 text-xs hidden sm:inline">to</span>
                                     <input type="time" value="${task.endTime || ''}" onchange="window.updateTask('${task.id}', 'endTime', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
                                 </div>
                             </div>
