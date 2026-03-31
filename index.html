@@ -50,11 +50,11 @@
         .fc-theme-standard .fc-scrollgrid { border-color: rgba(255, 255, 255, 0.08) !important; }
         .fc-button-primary { background-color: rgba(15, 23, 42, 0.6) !important; border-color: rgba(255, 255, 255, 0.08) !important; color: #cbd5e1 !important; }
         .fc-button-primary:hover { background-color: rgba(30, 41, 59, 0.8) !important; }
-        .fc-button-primary:not(:disabled).fc-button-active, .fc-button-primary:not(:disabled):active { background-color: #ff6b35 !important; border-color: #ff6b35 !important; color: white !important; }
-        .fc-day-today { background-color: rgba(255, 107, 53, 0.1) !important; }
+        .fc-button-primary:not(:disabled).fc-button-active, .fc-button-primary:not(:disabled):active { background-color: #3b82f6 !important; border-color: #3b82f6 !important; color: white !important; }
+        .fc-day-today { background-color: rgba(59, 130, 246, 0.15) !important; }
         .fc-col-header-cell-cushion { color: #94a3b8 !important; font-weight: 600; }
         .fc-daygrid-day-number { color: #cbd5e1 !important; }
-        .fc-event { border: none !important; border-radius: 4px !important; padding: 2px 4px !important; font-size: 0.75rem !important; font-weight: 600 !important; }
+        .fc-event { border-width: 1px !important; border-style: solid !important; border-radius: 4px !important; padding: 2px 4px !important; font-size: 0.75rem !important; font-weight: 600 !important; }
         .fc-toolbar-title { color: #f8fafc !important; font-size: 1.25rem !important; font-weight: 700 !important; }
         
         /* Tooltip for Heatmap */
@@ -334,12 +334,7 @@
             <div id="view-tasks" class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start w-full flex-1" style="display: none;">
                 <!-- Left: FullCalendar -->
                 <div class="lg:col-span-2 clean-card rounded-2xl p-6 min-h-[500px] flex flex-col h-full relative">
-                    <div class="absolute top-4 right-4 z-10">
-                        <button onclick="openMeetingModal()" class="bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg shadow-[#a855f7]/20 flex items-center gap-1.5 transition-colors">
-                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Meeting
-                        </button>
-                    </div>
-                    <div id="calendar" class="flex-1 w-full h-full text-slate-300 mt-8"></div>
+                    <div id="calendar" class="flex-1 w-full h-full text-slate-300 mt-2"></div>
                 </div>
                 
                 <!-- Right: Task List -->
@@ -758,8 +753,16 @@
                     start: start,
                     end: end,
                     allDay: !hasTime,
-                    backgroundColor: t.completed ? '#10b981' : (isMeeting ? '#a855f7' : (t.difficulty === 'hard' ? '#ef4444' : t.difficulty === 'medium' ? '#f59e0b' : '#3b82f6')),
-                    borderColor: 'transparent'
+                    backgroundColor: t.completed ? '#334155' : (isMeeting ? 'rgba(249, 115, 22, 0.2)' : '#2563eb'),
+                    textColor: t.completed ? '#94a3b8' : (isMeeting ? '#ffedd5' : '#ffffff'),
+                    borderColor: t.completed ? 'transparent' : (isMeeting ? '#f97316' : 'transparent'),
+                    extendedProps: {
+                        isMeeting: isMeeting,
+                        completed: t.completed,
+                        difficulty: t.difficulty,
+                        startTime: t.startTime,
+                        endTime: t.endTime
+                    }
                 };
             });
             calendarInstance.removeAllEvents();
@@ -779,6 +782,41 @@
                     height: '100%',
                     events: [],
                     editable: true, // Enable drag and drop
+                    eventContent: function(arg) {
+                        const props = arg.event.extendedProps;
+                        const isMeeting = props.isMeeting;
+                        const completed = props.completed;
+                        const isMonthView = arg.view.type === 'dayGridMonth';
+                        
+                        let html = '';
+                        
+                        if (isMeeting) {
+                            // Meeting style (Dark mode)
+                            const timeText = (arg.timeText && !isMonthView) ? `<div class="text-[10px] opacity-90 leading-tight">${arg.timeText}</div>` : '';
+                            html = `
+                                <div class="w-full h-full flex flex-col justify-start overflow-hidden">
+                                    <div class="font-medium text-[11px] leading-tight truncate">${arg.event.title}</div>
+                                    ${timeText}
+                                </div>
+                            `;
+                        } else {
+                            // Task style (Dark mode)
+                            const icon = completed ? 
+                                `<svg class="w-3 h-3 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>` : 
+                                `<svg class="w-3 h-3 mr-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>`;
+                            
+                            const textDecoration = completed ? 'line-through' : 'none';
+                            
+                            html = `
+                                <div class="w-full h-full flex items-center overflow-hidden">
+                                    ${icon}
+                                    <div class="font-medium text-[11px] truncate" style="text-decoration: ${textDecoration}">${arg.event.title}</div>
+                                </div>
+                            `;
+                        }
+                        
+                        return { html: html };
+                    },
                     eventDrop: function(info) {
                         const newDate = dateFns.format(info.event.start, 'yyyy-MM-dd');
                         const task = state.tasks.find(t => t.id === info.event.id);
@@ -1306,6 +1344,20 @@
             }
         };
 
+        window.deleteSourceTag = (sourceName) => {
+            if (confirm(`Are you sure you want to remove the tag "${sourceName}" from all tasks and meetings?`)) {
+                state.tasks.forEach(t => {
+                    if (t.source === sourceName) {
+                        t.source = '';
+                    }
+                });
+                window.renderTasks();
+                window.updateCalendarEvents();
+                window.saveData();
+                renderSourceChips();
+            }
+        };
+
         function renderSourceChips() {
             const taskChipsContainer = document.getElementById('task-source-chips');
             const meetingChipsContainer = document.getElementById('meeting-source-chips');
@@ -1313,20 +1365,22 @@
             // Get unique sources from existing tasks
             const sources = [...new Set(state.tasks.map(t => t.source).filter(s => s && s.trim() !== ''))];
             
+            const chipHTML = (s, targetId) => `
+                <button type="button" 
+                    onclick="document.getElementById('${targetId}').value = '${s}'" 
+                    oncontextmenu="event.preventDefault(); window.deleteSourceTag('${s}')"
+                    title="Right-click to delete"
+                    class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium transition-colors border border-slate-700">
+                    ${s}
+                </button>
+            `;
+
             if (taskChipsContainer) {
-                taskChipsContainer.innerHTML = sources.map(s => `
-                    <button type="button" onclick="document.getElementById('new-task-source').value = '${s}'" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium transition-colors border border-slate-700">
-                        ${s}
-                    </button>
-                `).join('');
+                taskChipsContainer.innerHTML = sources.map(s => chipHTML(s, 'new-task-source')).join('');
             }
 
             if (meetingChipsContainer) {
-                meetingChipsContainer.innerHTML = sources.map(s => `
-                    <button type="button" onclick="document.getElementById('meeting-source').value = '${s}'" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium transition-colors border border-slate-700">
-                        ${s}
-                    </button>
-                `).join('');
+                meetingChipsContainer.innerHTML = sources.map(s => chipHTML(s, 'meeting-source')).join('');
             }
         }
 
@@ -1481,8 +1535,18 @@
                     addGratitude();
                 }
             });
-            document.getElementById('btn-logout')?.addEventListener('click', () => { if (isOfflineMode) { state.user = null; isOfflineMode = false; showScreen('login'); window.location.reload(); } else { auth.signOut(); } });
-            document.getElementById('btn-offline-mode')?.addEventListener('click', () => { isOfflineMode = true; state.user = { uid: "offline_user", email: "offline@hero.com", displayName: "Offline Hero" }; document.getElementById('user-display-name').innerText = "Offline Hero"; loadUserData("offline_user"); showScreen('dashboard'); });
+            const checkExpiry = () => {
+                const loginTime = localStorage.getItem('login_timestamp');
+                if (loginTime && (Date.now() - parseInt(loginTime)) > 14 * 24 * 60 * 60 * 1000) {
+                    localStorage.removeItem('login_timestamp');
+                    localStorage.removeItem('offline_mode_active');
+                    return true;
+                }
+                return false;
+            };
+
+            document.getElementById('btn-logout')?.addEventListener('click', () => { localStorage.removeItem('login_timestamp'); localStorage.removeItem('offline_mode_active'); if (isOfflineMode) { state.user = null; isOfflineMode = false; showScreen('login'); window.location.reload(); } else { auth.signOut(); } });
+            document.getElementById('btn-offline-mode')?.addEventListener('click', () => { isOfflineMode = true; localStorage.setItem('offline_mode_active', 'true'); localStorage.setItem('login_timestamp', Date.now().toString()); state.user = { uid: "offline_user", email: "offline@hero.com", displayName: "Offline Hero" }; document.getElementById('user-display-name').innerText = "Offline Hero"; loadUserData("offline_user"); showScreen('dashboard'); });
             
             const authForm = document.getElementById('auth-form');
             if(authForm) {
@@ -1492,12 +1556,37 @@
                     const password = document.getElementById('input-password').value;
                     const username = document.getElementById('input-username').value;
                     const isRegistering = !document.getElementById('username-field').classList.contains('hidden');
-                    try { if (isRegistering) { const cred = await auth.createUserWithEmailAndPassword(email, password); if (cred.user) await cred.user.updateProfile({ displayName: username }); } else { await auth.signInWithEmailAndPassword(email, password); } } catch (err) { alert(err.message); }
+                    try { 
+                        if (auth && auth.setPersistence) await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+                        if (isRegistering) { const cred = await auth.createUserWithEmailAndPassword(email, password); if (cred.user) await cred.user.updateProfile({ displayName: username }); } else { await auth.signInWithEmailAndPassword(email, password); } 
+                        localStorage.setItem('login_timestamp', Date.now().toString());
+                    } catch (err) { alert(err.message); }
                 });
             }
             document.getElementById('btn-toggle-auth-mode')?.addEventListener('click', () => { const userField = document.getElementById('username-field'); const isHidden = userField.classList.contains('hidden'); userField.classList.toggle('hidden'); document.getElementById('btn-submit-auth').innerText = isHidden ? "Start Journey" : "Create Account"; document.getElementById('btn-toggle-auth-mode').innerText = isHidden ? "Create new account" : "Back to Login"; });
 
-            if (!isOfflineMode && auth) { auth.onAuthStateChanged(async (user) => { if (user) { state.user = user; document.getElementById('user-display-name').innerText = user.displayName || "Hero"; await loadUserData(user.uid); showScreen('dashboard'); } else { state.user = null; showScreen('login'); } }); }
+            const isExpired = checkExpiry();
+            if (localStorage.getItem('offline_mode_active') === 'true' && !isExpired) {
+                isOfflineMode = true;
+                state.user = { uid: "offline_user", email: "offline@hero.com", displayName: "Offline Hero" }; 
+                document.getElementById('user-display-name').innerText = "Offline Hero"; 
+                loadUserData("offline_user"); 
+                showScreen('dashboard'); 
+            } else if (!isOfflineMode && auth) { 
+                auth.onAuthStateChanged(async (user) => { 
+                    if (user && !checkExpiry()) { 
+                        localStorage.setItem('login_timestamp', Date.now().toString()); // Rolling 14 days
+                        state.user = user; 
+                        document.getElementById('user-display-name').innerText = user.displayName || "Hero"; 
+                        await loadUserData(user.uid); 
+                        showScreen('dashboard'); 
+                    } else { 
+                        if (user) auth.signOut();
+                        state.user = null; 
+                        showScreen('login'); 
+                    } 
+                }); 
+            }
             setTimeout(() => { document.getElementById('loading-overlay').classList.add('hidden'); if(!state.user && document.getElementById('dashboard-screen').classList.contains('hidden')) { document.getElementById('login-screen').classList.remove('hidden'); } }, 1000);
         });
 
