@@ -15,6 +15,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Date Fns -->
     <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
+    <!-- FullCalendar -->
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
 
     <!-- Firebase Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -42,6 +44,18 @@
             border: 1px solid rgba(255, 255, 255, 0.08);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
+
+        /* FullCalendar Dark Theme Overrides */
+        .fc-theme-standard td, .fc-theme-standard th { border-color: rgba(255, 255, 255, 0.08) !important; }
+        .fc-theme-standard .fc-scrollgrid { border-color: rgba(255, 255, 255, 0.08) !important; }
+        .fc-button-primary { background-color: rgba(15, 23, 42, 0.6) !important; border-color: rgba(255, 255, 255, 0.08) !important; color: #cbd5e1 !important; }
+        .fc-button-primary:hover { background-color: rgba(30, 41, 59, 0.8) !important; }
+        .fc-button-primary:not(:disabled).fc-button-active, .fc-button-primary:not(:disabled):active { background-color: #ff6b35 !important; border-color: #ff6b35 !important; color: white !important; }
+        .fc-day-today { background-color: rgba(255, 107, 53, 0.1) !important; }
+        .fc-col-header-cell-cushion { color: #94a3b8 !important; font-weight: 600; }
+        .fc-daygrid-day-number { color: #cbd5e1 !important; }
+        .fc-event { border: none !important; border-radius: 4px !important; padding: 2px 4px !important; font-size: 0.75rem !important; font-weight: 600 !important; }
+        .fc-toolbar-title { color: #f8fafc !important; font-size: 1.25rem !important; font-weight: 700 !important; }
         
         /* Tooltip for Heatmap */
         [data-tooltip]:hover::after {
@@ -66,6 +80,7 @@
         textarea.custom-scrollbar::-webkit-scrollbar { width: 4px; }
         textarea.custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
     </style>
+<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-[#020617] text-slate-100 antialiased selection:bg-[#ff6b35] selection:text-white min-h-screen flex flex-col">
 
@@ -135,22 +150,27 @@
         
         <!-- Header -->
         <header class="clean-card border-b border-slate-800 sticky top-0 z-50">
-            <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+            <div class="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:h-16 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-4">
                 
                 <!-- Brand -->
-                <div class="flex items-center gap-3 w-auto shrink-0">
-                    <div class="w-8 h-8 bg-[#ff6b35] rounded-lg flex items-center justify-center">
-                        <i data-lucide="activity" class="w-5 h-5 text-white"></i>
+                <div class="flex items-center gap-2 sm:gap-3 w-auto shrink-0">
+                    <div class="w-6 h-6 sm:w-8 sm:h-8 bg-[#ff6b35] rounded-lg flex items-center justify-center">
+                        <i data-lucide="activity" class="w-4 h-4 sm:w-5 sm:h-5 text-white"></i>
                     </div>
-                    <!-- Removed hidden sm:block -->
-                    <span class="font-bold text-lg text-white">Level Up Life</span>
+                    <span class="font-bold text-base sm:text-lg text-white hidden md:block">Level Up Life</span>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <div class="flex items-center gap-1 sm:gap-2 bg-slate-900/50 p-1 rounded-lg border border-slate-800 shrink-0 order-3 sm:order-none w-full sm:w-auto justify-center mt-2 sm:mt-0">
+                    <button id="nav-habits" onclick="switchTab('habits')" class="px-4 sm:px-4 py-1.5 rounded-md text-sm font-bold bg-[#ff6b35] text-white shadow-sm transition-all flex-1 sm:flex-none">Habits</button>
+                    <button id="nav-tasks" onclick="switchTab('tasks')" class="px-4 sm:px-4 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white transition-all flex-1 sm:flex-none">TaskFlow</button>
                 </div>
 
                 <!-- Spacer -->
-                <div class="flex-1"></div>
+                <div class="hidden sm:block flex-1"></div>
 
                 <!-- Simple Level & Stats -->
-                <div class="w-auto flex justify-end items-center gap-6">
+                <div class="w-auto flex justify-end items-center gap-3 sm:gap-6 shrink-0">
                      <div id="saving-indicator" class="hidden text-[#ff6b35] animate-pulse">
                         <i data-lucide="save" class="w-4 h-4"></i>
                     </div>
@@ -182,10 +202,10 @@
             </div>
         </header>
 
-        <main class="max-w-7xl mx-auto px-4 py-8 w-full flex-1">
+        <main class="max-w-7xl mx-auto px-4 py-8 w-full flex-1 flex flex-col">
             
-            <!-- Grid Layout -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            <!-- Habits View -->
+            <div id="view-habits" class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start w-full">
                 
                 <!-- LEFT COLUMN: Attributes & Consistency -->
                 <div class="space-y-6">
@@ -309,7 +329,158 @@
                 </div>
 
             </div>
+
+            <!-- Tasks View -->
+            <div id="view-tasks" class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start w-full flex-1" style="display: none;">
+                <!-- Left: FullCalendar -->
+                <div class="lg:col-span-2 clean-card rounded-2xl p-6 min-h-[500px] flex flex-col h-full relative">
+                    <div class="absolute top-4 right-4 z-10">
+                        <button onclick="openMeetingModal()" class="bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg shadow-[#a855f7]/20 flex items-center gap-1.5 transition-colors">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Meeting
+                        </button>
+                    </div>
+                    <div id="calendar" class="flex-1 w-full h-full text-slate-300 mt-8"></div>
+                </div>
+                
+                <!-- Right: Task List -->
+                <div class="space-y-6 flex flex-col h-full">
+                    <div class="clean-card rounded-2xl p-6 flex flex-col flex-1 max-h-[800px]">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                <i data-lucide="list-todo" class="w-5 h-5 text-[#ff6b35]"></i> Tasks
+                            </h3>
+                        </div>
+                        
+                        <!-- Inline Add Task -->
+                        <div class="mb-4 relative" id="new-task-container">
+                            <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-2 flex flex-col gap-2 focus-within:border-[#ff6b35]/50 transition-colors">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="plus" class="w-4 h-4 text-slate-500 ml-2"></i>
+                                    <input type="text" id="new-task-input" placeholder="Add a new task... (Enter to save)" class="bg-transparent w-full text-sm text-white placeholder-slate-600 px-2 outline-none">
+                                </div>
+                                
+                                <!-- Options Panel (Hidden by default) -->
+                                <div id="new-task-options" class="hidden flex-col gap-3 pt-3 pb-2 px-2 border-t border-slate-800/50 mt-1">
+                                    <!-- Source Selection -->
+                                    <div>
+                                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Source / Tag</label>
+                                        <div class="flex flex-wrap gap-1.5 mb-1.5" id="task-source-chips">
+                                            <!-- Chips populated dynamically -->
+                                        </div>
+                                        <input type="text" id="new-task-source" placeholder="Or type new source..." class="bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white outline-none focus:border-slate-600 w-full">
+                                    </div>
+                                    
+                                    <!-- Notes -->
+                                    <div>
+                                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Notes</label>
+                                        <textarea id="new-task-notes" placeholder="Add any additional notes here..." rows="2" class="bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white outline-none focus:border-slate-600 w-full resize-none"></textarea>
+                                    </div>
+                                    
+                                    <!-- Difficulty Selection -->
+                                    <div id="difficulty-section">
+                                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Difficulty</label>
+                                        <div class="flex gap-2" id="task-difficulty-btns">
+                                            <button type="button" data-diff="easy" class="diff-btn flex-1 py-1.5 rounded-md text-xs font-bold border border-slate-700 text-slate-400 hover:text-white transition-colors" data-active="false">Easy</button>
+                                            <button type="button" data-diff="medium" class="diff-btn flex-1 py-1.5 rounded-md text-xs font-bold border border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35] transition-colors" data-active="true">Medium</button>
+                                            <button type="button" data-diff="hard" class="diff-btn flex-1 py-1.5 rounded-md text-xs font-bold border border-slate-700 text-slate-400 hover:text-white transition-colors" data-active="false">Hard</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Date Selection -->
+                                    <div>
+                                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Date</label>
+                                        <div class="flex gap-2 items-center flex-wrap" id="task-date-btns">
+                                            <button type="button" data-date="today" class="date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35] transition-colors">Today</button>
+                                            <button type="button" data-date="tomorrow" class="date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-slate-700 text-slate-400 hover:text-white transition-colors">Tomorrow</button>
+                                            <input type="date" id="new-task-date-picker" class="bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white outline-none focus:border-slate-600 ml-auto">
+                                        </div>
+                                    </div>
+
+                                    <div class="flex justify-end mt-2">
+                                        <button type="button" id="btn-save-new-item" class="text-xs font-bold text-white bg-[#ff6b35] hover:bg-[#ff8c61] px-4 py-2 rounded-lg transition-colors flex items-center gap-1">
+                                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active Tasks -->
+                        <div id="active-tasks-list" class="space-y-2 flex-1 overflow-y-auto custom-scrollbar pr-2">
+                            <!-- Tasks will be rendered here -->
+                        </div>
+
+                        <!-- Completed Tasks (Collapsible) -->
+                        <div class="mt-4 pt-4 border-t border-slate-800">
+                            <button onclick="toggleCompletedTasks()" class="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-300 uppercase tracking-wider w-full transition-colors">
+                                <i data-lucide="chevron-down" id="completed-tasks-icon" class="w-4 h-4 transition-transform"></i>
+                                Completed Tasks (<span id="completed-tasks-count">0</span>)
+                            </button>
+                            <div id="completed-tasks-list" class="hidden mt-3 space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
+                                <!-- Completed tasks will be rendered here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="meeting-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300" id="meeting-modal-content">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2" id="meeting-modal-title">
+                    <i data-lucide="calendar-plus" class="w-5 h-5 text-[#a855f7]"></i>
+                    New Meeting
+                </h3>
+                <button onclick="closeMeetingModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-4">
+                <input type="hidden" id="meeting-id">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Title</label>
+                    <input type="text" id="meeting-title" placeholder="Meeting title..." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Date</label>
+                        <input type="date" id="meeting-date" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Source / Tag</label>
+                        <input type="text" id="meeting-source" placeholder="e.g., Project A" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
+                        <div id="meeting-source-chips" class="flex flex-wrap gap-1.5 mt-2"></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Start Time</label>
+                        <input type="time" id="meeting-start" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">End Time</label>
+                        <input type="time" id="meeting-end" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Notes</label>
+                    <textarea id="meeting-notes" placeholder="Meeting agenda or notes..." rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none resize-none custom-scrollbar transition-colors"></textarea>
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-800 flex justify-between bg-slate-800/30">
+                <button type="button" id="btn-delete-meeting" onclick="deleteMeeting()" class="hidden text-sm font-bold text-rose-500 hover:bg-rose-500/10 px-4 py-2 rounded-lg transition-colors flex items-center gap-1">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i> Delete
+                </button>
+                <div class="flex gap-2 ml-auto">
+                    <button type="button" onclick="closeMeetingModal()" class="text-sm font-bold text-slate-400 hover:text-white px-4 py-2 rounded-lg transition-colors">Cancel</button>
+                    <button type="button" onclick="saveMeeting()" class="text-sm font-bold text-white bg-[#a855f7] hover:bg-[#9333ea] px-5 py-2 rounded-lg transition-colors shadow-lg shadow-[#a855f7]/20">Save</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal -->
@@ -357,15 +528,48 @@
             user: null,
             habits: [],
             gratitudeLogs: [],
+            tasks: [],
             stats: { ...INITIAL_STATS },
             ui: {
                 selectedDate: new Date(),
                 viewDate: new Date(),
                 modalType: 'good', 
-                selectedStat: 'BODY'
+                selectedStat: 'BODY',
+                currentTab: 'habits',
+                expandedTaskId: null,
+                showCompletedTasks: false
             }
         };
         let radarChartInstance = null;
+        let calendarInstance = null;
+
+        window.switchTab = (tab) => {
+            state.ui.currentTab = tab;
+            const viewHabits = document.getElementById('view-habits');
+            const viewTasks = document.getElementById('view-tasks');
+            
+            if (tab === 'habits') {
+                viewHabits.style.display = 'grid';
+                viewTasks.style.display = 'none';
+            } else {
+                viewHabits.style.display = 'none';
+                viewTasks.style.display = 'grid';
+            }
+            
+            const navHabits = document.getElementById('nav-habits');
+            const navTasks = document.getElementById('nav-tasks');
+            
+            if (tab === 'habits') {
+                navHabits.className = "px-4 py-1.5 rounded-md text-sm font-bold bg-[#ff6b35] text-white shadow-sm transition-all";
+                navTasks.className = "px-4 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white transition-all";
+            } else {
+                navTasks.className = "px-4 py-1.5 rounded-md text-sm font-bold bg-[#ff6b35] text-white shadow-sm transition-all";
+                navHabits.className = "px-4 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white transition-all";
+                if (calendarInstance) {
+                    setTimeout(() => calendarInstance.render(), 10);
+                }
+            }
+        };
 
         window.selectDate = (dateStr) => { state.ui.selectedDate = new Date(dateStr); renderAll(); };
         window.toggleHabit = (id) => {
@@ -398,6 +602,81 @@
                 updateStats(-5, 'SOUL', -1);
                 renderAll();
                 saveData();
+            }
+        };
+
+        window.addTask = (title, source = '', difficulty = 'medium', date = null, type = 'task', startTime = '', endTime = '', notes = '') => {
+            if (!title.trim()) return;
+            const newTask = {
+                id: crypto.randomUUID(),
+                title: title.trim(),
+                notes: notes.trim(),
+                source: source.trim(),
+                difficulty: difficulty,
+                date: date || state.ui.newTaskDate || dateFns.format(new Date(), 'yyyy-MM-dd'),
+                type: type,
+                startTime: startTime,
+                endTime: endTime,
+                completed: false,
+                createdAt: new Date().toISOString()
+            };
+            state.tasks.push(newTask);
+            state.ui.newTaskDate = null; // Reset after adding
+            renderTasks();
+            updateCalendarEvents();
+            saveData();
+        };
+
+        window.toggleTask = (id) => {
+            const task = state.tasks.find(t => t.id === id);
+            if (task) {
+                task.completed = !task.completed;
+                if (task.completed) {
+                    updateStats(20, 'MIND', 1); // Reward for completing a task
+                } else {
+                    updateStats(-20, 'MIND', -1);
+                }
+                renderTasks();
+                updateCalendarEvents();
+                saveData();
+            }
+        };
+
+        window.deleteTask = (id) => {
+            if (confirm("Delete this task?")) {
+                state.tasks = state.tasks.filter(t => t.id !== id);
+                if (state.ui.expandedTaskId === id) state.ui.expandedTaskId = null;
+                renderTasks();
+                updateCalendarEvents();
+                saveData();
+            }
+        };
+
+        window.expandTask = (id) => {
+            state.ui.expandedTaskId = state.ui.expandedTaskId === id ? null : id;
+            renderTasks();
+        };
+
+        window.updateTask = (id, field, value) => {
+            const task = state.tasks.find(t => t.id === id);
+            if (task) {
+                task[field] = value;
+                renderTasks();
+                updateCalendarEvents();
+                saveData();
+            }
+        };
+
+        window.toggleCompletedTasks = () => {
+            state.ui.showCompletedTasks = !state.ui.showCompletedTasks;
+            const list = document.getElementById('completed-tasks-list');
+            const icon = document.getElementById('completed-tasks-icon');
+            if (state.ui.showCompletedTasks) {
+                list.classList.remove('hidden');
+                icon.classList.add('rotate-180');
+            } else {
+                list.classList.add('hidden');
+                icon.classList.remove('rotate-180');
             }
         };
         window.toggleGratitudeHistory = () => document.getElementById('gratitude-history').classList.toggle('hidden');
@@ -455,7 +734,248 @@
             saveData();
         }
 
-        function renderAll() { renderStats(); renderDate(); renderHabits(); renderHeatmap(); renderGratitude(); safeCreateIcons(); }
+        function renderAll() { renderStats(); renderDate(); renderHabits(); renderHeatmap(); renderGratitude(); renderTasks(); updateCalendarEvents(); safeCreateIcons(); }
+        
+        function updateCalendarEvents() {
+            if (!calendarInstance) return;
+            const events = state.tasks.map(t => {
+                const isMeeting = t.type === 'meeting';
+                const hasTime = isMeeting && t.startTime;
+                
+                let start = t.date;
+                if (hasTime) {
+                    start = `${t.date}T${t.startTime}`;
+                }
+                
+                let end = null;
+                if (hasTime && t.endTime) {
+                    end = `${t.date}T${t.endTime}`;
+                }
+
+                return {
+                    id: t.id,
+                    title: t.title,
+                    start: start,
+                    end: end,
+                    allDay: !hasTime,
+                    backgroundColor: t.completed ? '#10b981' : (isMeeting ? '#a855f7' : (t.difficulty === 'hard' ? '#ef4444' : t.difficulty === 'medium' ? '#f59e0b' : '#3b82f6')),
+                    borderColor: 'transparent'
+                };
+            });
+            calendarInstance.removeAllEvents();
+            calendarInstance.addEventSource(events);
+        }
+
+        function initCalendar() {
+            const calendarEl = document.getElementById('calendar');
+            if (calendarEl && window.FullCalendar) {
+                calendarInstance = new FullCalendar.Calendar(calendarEl, {
+                    initialView: 'dayGridMonth',
+                    headerToolbar: {
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                    },
+                    height: '100%',
+                    events: [],
+                    editable: true, // Enable drag and drop
+                    eventDrop: function(info) {
+                        const newDate = dateFns.format(info.event.start, 'yyyy-MM-dd');
+                        const task = state.tasks.find(t => t.id === info.event.id);
+                        if (task) {
+                            task.date = newDate;
+                            if (task.type === 'meeting') {
+                                if (!info.event.allDay) {
+                                    task.startTime = dateFns.format(info.event.start, 'HH:mm');
+                                    if (info.event.end) {
+                                        task.endTime = dateFns.format(info.event.end, 'HH:mm');
+                                    } else {
+                                        // Default to 1 hour if no end time is provided by the drop
+                                        const endDate = dateFns.addHours(info.event.start, 1);
+                                        task.endTime = dateFns.format(endDate, 'HH:mm');
+                                    }
+                                } else {
+                                    task.startTime = '';
+                                    task.endTime = '';
+                                }
+                            } else {
+                                // If a task is dropped into a time slot, we could convert it to a meeting,
+                                // but for now we just update its date and keep it as an all-day task.
+                                // FullCalendar might render it at the time slot until we refresh events.
+                            }
+                            window.renderTasks();
+                            window.updateCalendarEvents();
+                            window.saveData();
+                        }
+                    },
+                    eventResize: function(info) {
+                        const task = state.tasks.find(t => t.id === info.event.id);
+                        if (task && task.type === 'meeting' && !info.event.allDay && info.event.end) {
+                            task.endTime = dateFns.format(info.event.end, 'HH:mm');
+                            window.renderTasks();
+                            window.updateCalendarEvents();
+                            window.saveData();
+                        }
+                    },
+                    dateClick: function(info) {
+                        const hasTime = info.dateStr.includes('T');
+                        if (hasTime) {
+                            window.openMeetingModal(info);
+                        } else {
+                            state.ui.newTaskDate = info.dateStr;
+                            const input = document.getElementById('new-task-input');
+                            input.placeholder = `Add task for ${info.dateStr}... (Enter to save)`;
+                            
+                            // Also update the date picker in the options panel
+                            const datePicker = document.getElementById('new-task-date-picker');
+                            if (datePicker) {
+                                datePicker.value = info.dateStr;
+                                // Reset date buttons since it's a custom date
+                                const dateBtns = document.querySelectorAll('#task-date-btns .date-btn');
+                                dateBtns.forEach(b => {
+                                    b.className = 'date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-slate-700 text-slate-400 hover:text-white transition-colors';
+                                });
+                            }
+                            
+                            input.focus();
+                        }
+                    },
+                    eventClick: function(info) {
+                        const task = state.tasks.find(t => t.id === info.event.id);
+                        if (task) {
+                            if (task.type === 'meeting') {
+                                window.openMeetingModal(null, task);
+                            } else {
+                                window.expandTask(info.event.id);
+                                // Scroll to the task in the list
+                                setTimeout(() => {
+                                    const taskEl = document.getElementById(`task-el-${info.event.id}`);
+                                    if (taskEl) {
+                                        taskEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }
+                                }, 100);
+                            }
+                        }
+                    }
+                });
+                calendarInstance.render();
+                updateCalendarEvents();
+            }
+        }
+
+        function renderTasks() {
+            const activeList = document.getElementById('active-tasks-list');
+            const completedList = document.getElementById('completed-tasks-list');
+            const completedCount = document.getElementById('completed-tasks-count');
+            
+            if (!activeList || !completedList) return;
+
+            activeList.innerHTML = '';
+            completedList.innerHTML = '';
+            
+            let completedTasksCount = 0;
+
+            const createTaskHTML = (task) => {
+                const isExpanded = state.ui.expandedTaskId === task.id;
+                const isCompleted = task.completed;
+                const isMeeting = task.type === 'meeting';
+                
+                let html = `
+                <div id="task-el-${task.id}" class="bg-slate-900/50 border ${isExpanded ? 'border-[#ff6b35]' : 'border-slate-800'} rounded-xl p-3 transition-colors">
+                    <div class="flex items-center gap-3 cursor-pointer" onclick="window.expandTask('${task.id}')">
+                        <div onclick="event.stopPropagation(); window.toggleTask('${task.id}')" class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isCompleted ? 'border-[#10b981] bg-[#10b981]/20' : 'border-slate-600 hover:border-[#ff6b35]'}">
+                            ${isCompleted ? '<i data-lucide="check" class="w-3 h-3 text-[#10b981]"></i>' : (isMeeting ? '<i data-lucide="users" class="w-3 h-3 text-slate-400"></i>' : '')}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h4 class="text-sm font-medium ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-200'} truncate">${task.title}</h4>
+                        </div>
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                                ${isMeeting && task.startTime ? `${task.date} ${task.startTime}` : task.date}
+                            </span>
+                        </div>
+                    </div>
+                `;
+
+                if (isExpanded) {
+                    html += `
+                    <div class="mt-4 pt-4 border-t border-slate-800 space-y-3 fade-in">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Title</label>
+                            <input type="text" value="${task.title}" onchange="window.updateTask('${task.id}', 'title', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Notes</label>
+                            <textarea onchange="window.updateTask('${task.id}', 'notes', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none resize-none custom-scrollbar" rows="2">${task.notes || ''}</textarea>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Source</label>
+                                <input type="text" value="${task.source || ''}" onchange="window.updateTask('${task.id}', 'source', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
+                            </div>
+                            ${isMeeting ? `
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Time</label>
+                                <div class="flex gap-2 items-center">
+                                    <input type="time" value="${task.startTime || ''}" onchange="window.updateTask('${task.id}', 'startTime', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
+                                    <span class="text-slate-500 text-xs">to</span>
+                                    <input type="time" value="${task.endTime || ''}" onchange="window.updateTask('${task.id}', 'endTime', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
+                                </div>
+                            </div>
+                            ` : `
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Difficulty</label>
+                                <div class="flex gap-1">
+                                    <button type="button" onclick="window.updateTask('${task.id}', 'difficulty', 'easy')" class="flex-1 py-1.5 rounded-md text-xs font-bold border ${task.difficulty === 'easy' ? 'border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35]' : 'border-slate-700 text-slate-400 hover:text-white'} transition-colors">Easy</button>
+                                    <button type="button" onclick="window.updateTask('${task.id}', 'difficulty', 'medium')" class="flex-1 py-1.5 rounded-md text-xs font-bold border ${task.difficulty === 'medium' ? 'border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35]' : 'border-slate-700 text-slate-400 hover:text-white'} transition-colors">Medium</button>
+                                    <button type="button" onclick="window.updateTask('${task.id}', 'difficulty', 'hard')" class="flex-1 py-1.5 rounded-md text-xs font-bold border ${task.difficulty === 'hard' ? 'border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35]' : 'border-slate-700 text-slate-400 hover:text-white'} transition-colors">Hard</button>
+                                </div>
+                            </div>
+                            `}
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Date</label>
+                            <input type="date" value="${task.date}" onchange="window.updateTask('${task.id}', 'date', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
+                        </div>
+                        <div class="flex justify-end pt-2 gap-2">
+                            <button onclick="window.deleteTask('${task.id}')" class="text-xs font-bold text-rose-500 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
+                            </button>
+                            <button onclick="window.expandTask(null)" class="text-xs font-bold text-white bg-[#ff6b35] hover:bg-[#ff8c61] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                                <i data-lucide="save" class="w-3.5 h-3.5"></i> Save
+                            </button>
+                        </div>
+                    </div>
+                    `;
+                }
+
+                html += `</div>`;
+                return html;
+            };
+
+            // Sort tasks: incomplete first, then by date, and filter out meetings
+            const sortedTasks = [...state.tasks].filter(t => t.type !== 'meeting').sort((a, b) => {
+                if (a.completed !== b.completed) return a.completed ? 1 : -1;
+                return new Date(a.date) - new Date(b.date);
+            });
+
+            sortedTasks.forEach(task => {
+                if (task.completed) {
+                    completedList.innerHTML += createTaskHTML(task);
+                    completedTasksCount++;
+                } else {
+                    activeList.innerHTML += createTaskHTML(task);
+                }
+            });
+
+            if (activeList.innerHTML === '') {
+                activeList.innerHTML = `<div class="text-center py-8 border-2 border-dashed border-slate-800/50 rounded-xl text-slate-600"><p class="text-sm">No active tasks. You're all caught up!</p></div>`;
+            }
+            
+            if (completedCount) completedCount.innerText = completedTasksCount;
+            safeCreateIcons();
+        }
+
         function renderDate() {
             if(window.dateFns && document.getElementById('selected-date-display')) {
                 const isToday = dateFns.isSameDay(state.ui.selectedDate, new Date());
@@ -676,9 +1196,276 @@
              }
         }
 
+        function initNewTaskOptions() {
+            const input = document.getElementById('new-task-input');
+            const optionsPanel = document.getElementById('new-task-options');
+            const container = document.getElementById('new-task-container');
+            
+            if (!input || !optionsPanel || !container) return;
+
+            // Show panel on focus
+            input.addEventListener('focus', () => {
+                optionsPanel.classList.remove('hidden');
+                optionsPanel.classList.add('flex');
+                renderSourceChips();
+            });
+
+            // Hide panel when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!container.contains(e.target)) {
+                    optionsPanel.classList.add('hidden');
+                    optionsPanel.classList.remove('flex');
+                }
+            });
+
+            // Handle Difficulty Buttons
+            const diffBtns = document.querySelectorAll('#task-difficulty-btns .diff-btn');
+            diffBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    // Reset all
+                    diffBtns.forEach(b => {
+                        b.className = 'diff-btn flex-1 py-1.5 rounded-md text-xs font-bold border border-slate-700 text-slate-400 hover:text-white transition-colors';
+                        b.dataset.active = 'false';
+                    });
+                    // Set active
+                    e.target.className = `diff-btn flex-1 py-1.5 rounded-md text-xs font-bold border border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35] transition-colors`;
+                    e.target.dataset.active = 'true';
+                });
+            });
+
+            // Handle Date Buttons
+            const dateBtns = document.querySelectorAll('#task-date-btns .date-btn');
+            const datePicker = document.getElementById('new-task-date-picker');
+            
+            const resetDateBtns = () => {
+                dateBtns.forEach(b => {
+                    b.className = 'date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-slate-700 text-slate-400 hover:text-white transition-colors';
+                });
+            };
+
+            dateBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    resetDateBtns();
+                    e.target.className = `date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35] transition-colors`;
+                    
+                    const type = e.target.dataset.date;
+                    if (type === 'today') {
+                        datePicker.value = dateFns.format(new Date(), 'yyyy-MM-dd');
+                    } else if (type === 'tomorrow') {
+                        datePicker.value = dateFns.format(dateFns.addDays(new Date(), 1), 'yyyy-MM-dd');
+                    }
+                });
+            });
+
+            // Initialize date picker with today if not set
+            if (!datePicker.value) {
+                datePicker.value = dateFns.format(new Date(), 'yyyy-MM-dd');
+            }
+            
+            datePicker.addEventListener('change', () => {
+                resetDateBtns(); // Custom date selected
+            });
+
+            // Handle Save Button
+            const saveBtn = document.getElementById('btn-save-new-item');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => {
+                    window.saveNewItem();
+                });
+            }
+        }
+
+        window.saveNewItem = () => {
+            const input = document.getElementById('new-task-input');
+            const title = input.value;
+            if (!title.trim()) return;
+
+            const source = document.getElementById('new-task-source')?.value || '';
+            
+            let type = 'task';
+
+            let difficulty = 'medium';
+            const activeDiffBtn = document.querySelector('#task-difficulty-btns .diff-btn[data-active="true"]');
+            if (activeDiffBtn) difficulty = activeDiffBtn.dataset.diff;
+
+            const date = document.getElementById('new-task-date-picker')?.value || state.ui.newTaskDate || dateFns.format(new Date(), 'yyyy-MM-dd');
+            
+            const notes = document.getElementById('new-task-notes')?.value || '';
+
+            window.addTask(title, source, difficulty, date, type, '', '', notes);
+            
+            input.value = '';
+            input.placeholder = 'Add a new task... (Enter to save)';
+            if (document.getElementById('new-task-source')) document.getElementById('new-task-source').value = '';
+            if (document.getElementById('new-task-notes')) document.getElementById('new-task-notes').value = '';
+            
+            const optionsPanel = document.getElementById('new-task-options');
+            if(optionsPanel) {
+                optionsPanel.classList.add('hidden');
+                optionsPanel.classList.remove('flex');
+            }
+        };
+
+        function renderSourceChips() {
+            const taskChipsContainer = document.getElementById('task-source-chips');
+            const meetingChipsContainer = document.getElementById('meeting-source-chips');
+            
+            // Get unique sources from existing tasks
+            const sources = [...new Set(state.tasks.map(t => t.source).filter(s => s && s.trim() !== ''))];
+            
+            if (taskChipsContainer) {
+                taskChipsContainer.innerHTML = sources.map(s => `
+                    <button type="button" onclick="document.getElementById('new-task-source').value = '${s}'" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium transition-colors border border-slate-700">
+                        ${s}
+                    </button>
+                `).join('');
+            }
+
+            if (meetingChipsContainer) {
+                meetingChipsContainer.innerHTML = sources.map(s => `
+                    <button type="button" onclick="document.getElementById('meeting-source').value = '${s}'" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium transition-colors border border-slate-700">
+                        ${s}
+                    </button>
+                `).join('');
+            }
+        }
+
+        window.openMeetingModal = (info = null, existingMeeting = null) => {
+            const modal = document.getElementById('meeting-modal');
+            const content = document.getElementById('meeting-modal-content');
+            
+            // Reset fields
+            document.getElementById('meeting-id').value = '';
+            document.getElementById('meeting-title').value = '';
+            document.getElementById('meeting-source').value = '';
+            document.getElementById('meeting-notes').value = '';
+            document.getElementById('meeting-date').value = dateFns.format(new Date(), 'yyyy-MM-dd');
+            document.getElementById('meeting-start').value = '';
+            document.getElementById('meeting-end').value = '';
+            
+            document.getElementById('btn-delete-meeting').classList.add('hidden');
+            document.getElementById('meeting-modal-title').innerHTML = '<i data-lucide="calendar-plus" class="w-5 h-5 text-[#a855f7]"></i> New Meeting';
+
+            if (existingMeeting) {
+                document.getElementById('meeting-id').value = existingMeeting.id;
+                document.getElementById('meeting-title').value = existingMeeting.title;
+                document.getElementById('meeting-source').value = existingMeeting.source || '';
+                document.getElementById('meeting-notes').value = existingMeeting.notes || '';
+                document.getElementById('meeting-date').value = existingMeeting.date;
+                document.getElementById('meeting-start').value = existingMeeting.startTime || '';
+                document.getElementById('meeting-end').value = existingMeeting.endTime || '';
+                document.getElementById('btn-delete-meeting').classList.remove('hidden');
+                document.getElementById('meeting-modal-title').innerHTML = '<i data-lucide="calendar-edit" class="w-5 h-5 text-[#a855f7]"></i> Edit Meeting';
+            } else if (info) {
+                // From dateClick or select
+                if (info.dateStr) {
+                    const hasTime = info.dateStr.includes('T');
+                    if (hasTime) {
+                        document.getElementById('meeting-date').value = info.dateStr.split('T')[0];
+                        document.getElementById('meeting-start').value = info.dateStr.split('T')[1].substring(0, 5);
+                        // default end time to +1 hour
+                        const endDate = dateFns.addHours(info.date, 1);
+                        document.getElementById('meeting-end').value = dateFns.format(endDate, 'HH:mm');
+                    } else {
+                        document.getElementById('meeting-date').value = info.dateStr;
+                    }
+                }
+            }
+
+            modal.classList.remove('hidden');
+            // trigger reflow
+            void modal.offsetWidth;
+            modal.classList.remove('opacity-0');
+            content.classList.remove('scale-95');
+            safeCreateIcons();
+            renderSourceChips();
+        };
+
+        window.closeMeetingModal = () => {
+            const modal = document.getElementById('meeting-modal');
+            const content = document.getElementById('meeting-modal-content');
+            modal.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        };
+
+        window.saveMeeting = () => {
+            const id = document.getElementById('meeting-id').value;
+            const title = document.getElementById('meeting-title').value;
+            const source = document.getElementById('meeting-source').value;
+            const notes = document.getElementById('meeting-notes').value;
+            const date = document.getElementById('meeting-date').value;
+            const startTime = document.getElementById('meeting-start').value;
+            const endTime = document.getElementById('meeting-end').value;
+
+            if (!title.trim()) {
+                alert('Please enter a meeting title');
+                return;
+            }
+
+            if (id) {
+                // Update existing
+                const meeting = state.tasks.find(t => t.id === id);
+                if (meeting) {
+                    meeting.title = title;
+                    meeting.source = source;
+                    meeting.notes = notes;
+                    meeting.date = date;
+                    meeting.startTime = startTime;
+                    meeting.endTime = endTime;
+                }
+            } else {
+                // Create new
+                window.addTask(title, source, 'medium', date, 'meeting', startTime, endTime, notes);
+            }
+
+            window.renderTasks();
+            window.updateCalendarEvents();
+            window.saveData();
+            closeMeetingModal();
+        };
+
+        window.deleteMeeting = () => {
+            const id = document.getElementById('meeting-id').value;
+            if (id && confirm('Delete this meeting?')) {
+                state.tasks = state.tasks.filter(t => t.id !== id);
+                window.renderTasks();
+                window.updateCalendarEvents();
+                window.saveData();
+                closeMeetingModal();
+            }
+        };
+
         document.addEventListener('DOMContentLoaded', () => {
             safeCreateIcons();
+            initCalendar();
+            initNewTaskOptions();
             try { if (typeof firebase !== 'undefined') { app = firebase.initializeApp(firebaseConfig); auth = firebase.auth(); db = firebase.firestore(); } else { isOfflineMode = true; } } catch (e) { isOfflineMode = true; }
+
+            const handleEnterToSave = (e) => {
+                if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
+                    e.preventDefault();
+                    window.saveNewItem();
+                }
+            };
+
+            const taskInput = document.getElementById('new-task-input');
+            taskInput?.addEventListener('keydown', handleEnterToSave);
+            
+            const sourceInput = document.getElementById('new-task-source');
+            sourceInput?.addEventListener('keydown', handleEnterToSave);
+
+            const datePickerInput = document.getElementById('new-task-date-picker');
+            datePickerInput?.addEventListener('keydown', handleEnterToSave);
+
+            taskInput?.addEventListener('blur', (e) => {
+                if (!e.target.value.trim()) {
+                    state.ui.newTaskDate = null;
+                    e.target.placeholder = 'Add a new task... (Enter to save)';
+                }
+            });
 
             document.getElementById('btn-save-habit')?.addEventListener('click', () => {
                 const title = document.getElementById('modal-habit-title').value;
@@ -720,14 +1507,14 @@
             if (!isOfflineMode && db) {
                 try {
                     const docSnap = await db.collection('users').doc(uid).get();
-                    if (docSnap.exists) { const data = docSnap.data(); state.habits = (data.habits || []).map(h => ({...h, type: h.type || 'good'})); state.gratitudeLogs = data.gratitudeLogs || []; state.stats = data.stats || INITIAL_STATS; } 
-                    else { if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.stats = localData.stats || INITIAL_STATS; } await db.collection('users').doc(uid).set({ habits: state.habits, gratitudeLogs: state.gratitudeLogs, stats: state.stats }, { merge: true }); }
-                } catch (e) { if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.stats = localData.stats || INITIAL_STATS; } }
-            } else if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.stats = localData.stats || INITIAL_STATS; }
+                    if (docSnap.exists) { const data = docSnap.data(); state.habits = (data.habits || []).map(h => ({...h, type: h.type || 'good'})); state.gratitudeLogs = data.gratitudeLogs || []; state.tasks = data.tasks || []; state.stats = data.stats || INITIAL_STATS; } 
+                    else { if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.tasks = localData.tasks || []; state.stats = localData.stats || INITIAL_STATS; } await db.collection('users').doc(uid).set({ habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, stats: state.stats }, { merge: true }); }
+                } catch (e) { if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.tasks = localData.tasks || []; state.stats = localData.stats || INITIAL_STATS; } }
+            } else if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.tasks = localData.tasks || []; state.stats = localData.stats || INITIAL_STATS; }
             renderAll();
         }
         async function saveData() {
-            const dataToSave = { habits: state.habits, gratitudeLogs: state.gratitudeLogs, stats: state.stats };
+            const dataToSave = { habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, stats: state.stats };
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
             if (!isOfflineMode && state.user && state.user.uid !== 'offline_user' && db) {
                 document.getElementById('saving-indicator').classList.remove('hidden');
@@ -736,5 +1523,6 @@
             }
         }
     </script>
+<script type="module" src="/index.tsx"></script>
 </body>
 </html>
