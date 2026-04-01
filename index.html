@@ -17,6 +17,8 @@
     <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
     <!-- FullCalendar -->
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    <!-- SortableJS -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
     <!-- Firebase Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -543,6 +545,7 @@
             habits: [],
             gratitudeLogs: [],
             tasks: [],
+            sources: [], // Persisted order of tags
             stats: { ...INITIAL_STATS },
             ui: {
                 selectedDate: new Date(),
@@ -632,9 +635,16 @@
                 startTime: startTime,
                 endTime: endTime,
                 completed: false,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                order: state.tasks.length // Add order property
             };
             state.tasks.push(newTask);
+            
+            // Add to sources if not exists
+            if (newTask.source && !state.sources.includes(newTask.source)) {
+                state.sources.push(newTask.source);
+            }
+
             state.ui.newTaskDate = null; // Reset after adding
             renderTasks();
             updateCalendarEvents();
@@ -674,7 +684,11 @@
         window.updateTask = (id, field, value) => {
             const task = state.tasks.find(t => t.id === id);
             if (task) {
-                task[field] = value;
+                if (typeof field === 'object') {
+                    Object.assign(task, field);
+                } else {
+                    task[field] = value;
+                }
                 renderTasks();
                 updateCalendarEvents();
                 saveData();
@@ -957,9 +971,15 @@
                 const isCompleted = task.completed;
                 const isMeeting = task.type === 'meeting';
                 
+                const diffMap = { easy: 'E', medium: 'M', hard: 'H' };
+                const diffColor = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+
                 let html = `
-                <div id="task-el-${task.id}" class="bg-slate-900/50 border ${isExpanded ? 'border-[#ff6b35]' : 'border-slate-800'} rounded-xl p-3 transition-colors">
+                <div id="task-el-${task.id}" data-id="${task.id}" class="task-item bg-slate-900/50 border ${isExpanded ? 'border-[#ff6b35]' : 'border-slate-800'} rounded-xl p-3 transition-colors">
                     <div class="flex items-center gap-3 cursor-pointer" onclick="window.expandTask('${task.id}')">
+                        <div class="drag-handle cursor-grab active:cursor-grabbing p-1 text-slate-600 hover:text-slate-400">
+                            <i data-lucide="grip-vertical" class="w-4 h-4"></i>
+                        </div>
                         <div onclick="event.stopPropagation(); window.toggleTask('${task.id}')" class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isCompleted ? 'border-[#10b981] bg-[#10b981]/20' : 'border-slate-600 hover:border-[#ff6b35]'}">
                             ${isCompleted ? '<i data-lucide="check" class="w-3 h-3 text-[#10b981]"></i>' : (isMeeting ? '<i data-lucide="users" class="w-3 h-3 text-slate-400"></i>' : '')}
                         </div>
@@ -967,15 +987,16 @@
                             <h4 class="text-sm font-medium ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-200'} truncate">${task.title}</h4>
                         </div>
                         <div class="flex items-center gap-2 flex-shrink-0">
-                            ${task.date ? `
-                            <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-                                ${isMeeting && task.startTime ? `${task.date} ${task.startTime}` : task.date}
+                            ${task.source ? `
+                            <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider">
+                                ${task.source}
                             </span>
-                            ` : `
-                            <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-800/50 text-slate-500 border border-slate-700/50">
-                                No Date
+                            ` : ''}
+                            ${!isMeeting ? `
+                            <span class="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${diffColor}">
+                                ${diffMap[task.difficulty || 'medium']}
                             </span>
-                            `}
+                            ` : ''}
                         </div>
                     </div>
                 `;
@@ -985,24 +1006,24 @@
                     <div class="mt-4 pt-4 border-t border-slate-800 space-y-3 fade-in">
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Title</label>
-                            <input type="text" value="${task.title}" onchange="window.updateTask('${task.id}', 'title', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
+                            <input type="text" value="${task.title}" onblur="window.updateTask('${task.id}', 'title', this.value)" onchange="window.updateTask('${task.id}', 'title', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Notes</label>
-                            <textarea onchange="window.updateTask('${task.id}', 'notes', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none resize-none custom-scrollbar" rows="2">${task.notes || ''}</textarea>
+                            <textarea onblur="window.updateTask('${task.id}', 'notes', this.value)" onchange="window.updateTask('${task.id}', 'notes', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none resize-none custom-scrollbar" rows="2">${task.notes || ''}</textarea>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Source</label>
-                                <input type="text" value="${task.source || ''}" onchange="window.updateTask('${task.id}', 'source', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
+                                <input type="text" value="${task.source || ''}" onblur="window.updateTask('${task.id}', 'source', this.value)" onchange="window.updateTask('${task.id}', 'source', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
                             </div>
                             ${isMeeting ? `
                             <div>
                                 <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Time</label>
                                 <div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-                                    <input type="time" value="${task.startTime || ''}" onchange="window.updateTask('${task.id}', 'startTime', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
+                                    <input type="time" value="${task.startTime || ''}" onblur="window.updateTask('${task.id}', 'startTime', this.value)" onchange="window.updateTask('${task.id}', 'startTime', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
                                     <span class="text-slate-500 text-xs hidden sm:inline">to</span>
-                                    <input type="time" value="${task.endTime || ''}" onchange="window.updateTask('${task.id}', 'endTime', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
+                                    <input type="time" value="${task.endTime || ''}" onblur="window.updateTask('${task.id}', 'endTime', this.value)" onchange="window.updateTask('${task.id}', 'endTime', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
                                 </div>
                             </div>
                             ` : `
@@ -1018,14 +1039,14 @@
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Date</label>
-                            <input type="date" value="${task.date}" onchange="window.updateTask('${task.id}', 'date', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
+                            <input type="date" value="${task.date}" onblur="window.updateTask('${task.id}', 'date', this.value)" onchange="window.updateTask('${task.id}', 'date', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
                         </div>
                         <div class="flex justify-end pt-2 gap-2">
                             <button onclick="window.deleteTask('${task.id}')" class="text-xs font-bold text-rose-500 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
                                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
                             </button>
                             <button onclick="window.expandTask(null)" class="text-xs font-bold text-white bg-[#ff6b35] hover:bg-[#ff8c61] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                                <i data-lucide="save" class="w-3.5 h-3.5"></i> Save
+                                <i data-lucide="check" class="w-3.5 h-3.5"></i> Done
                             </button>
                         </div>
                     </div>
@@ -1036,12 +1057,10 @@
                 return html;
             };
 
-            // Sort tasks: incomplete first, then by date, and filter out meetings
+            // Sort tasks: incomplete first, then by order property
             const sortedTasks = [...state.tasks].filter(t => t.type !== 'meeting').sort((a, b) => {
                 if (a.completed !== b.completed) return a.completed ? 1 : -1;
-                const dateA = a.date ? new Date(a.date).getTime() : Infinity;
-                const dateB = b.date ? new Date(b.date).getTime() : Infinity;
-                return dateA - dateB;
+                return (a.order || 0) - (b.order || 0);
             });
 
             sortedTasks.forEach(task => {
@@ -1059,6 +1078,36 @@
             
             if (completedCount) completedCount.innerText = completedTasksCount;
             safeCreateIcons();
+
+            // Initialize Sortable
+            if (window.Sortable) {
+                new Sortable(activeList, {
+                    animation: 150,
+                    handle: '.drag-handle',
+                    ghostClass: 'opacity-50',
+                    onEnd: function() {
+                        const newOrder = Array.from(activeList.children).map(el => el.dataset.id);
+                        newOrder.forEach((id, index) => {
+                            const task = state.tasks.find(t => t.id === id);
+                            if (task) task.order = index;
+                        });
+                        saveData();
+                    }
+                });
+                new Sortable(completedList, {
+                    animation: 150,
+                    handle: '.drag-handle',
+                    ghostClass: 'opacity-50',
+                    onEnd: function() {
+                        const newOrder = Array.from(completedList.children).map(el => el.dataset.id);
+                        newOrder.forEach((id, index) => {
+                            const task = state.tasks.find(t => t.id === id);
+                            if (task) task.order = index;
+                        });
+                        saveData();
+                    }
+                });
+            }
         }
 
         function renderDate() {
@@ -1415,26 +1464,62 @@
             const taskChipsContainer = document.getElementById('task-source-chips');
             const meetingChipsContainer = document.getElementById('meeting-source-chips');
             
-            // Get unique sources from existing tasks
-            const sources = [...new Set(state.tasks.map(t => t.source).filter(s => s && s.trim() !== ''))];
+            // Get unique sources from existing tasks and merge with persisted sources
+            const taskSources = [...new Set(state.tasks.map(t => t.source).filter(s => s && s.trim() !== ''))];
             
+            // Update state.sources to include any new sources found in tasks
+            taskSources.forEach(s => {
+                if (!state.sources.includes(s)) state.sources.push(s);
+            });
+            
+            // Filter state.sources to only include sources that actually exist in tasks
+            state.sources = state.sources.filter(s => taskSources.includes(s));
+
             const chipHTML = (s, targetId) => `
-                <button type="button" 
-                    onclick="document.getElementById('${targetId}').value = '${s}'" 
-                    oncontextmenu="event.preventDefault(); window.deleteSourceTag('${s}')"
-                    title="Right-click to delete"
-                    class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium transition-colors border border-slate-700">
-                    ${s}
-                </button>
+                <div class="source-chip flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium transition-colors border border-slate-700" data-source="${s}">
+                    <div class="chip-drag-handle cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400">
+                        <i data-lucide="grip-vertical" class="w-2.5 h-2.5"></i>
+                    </div>
+                    <button type="button" 
+                        onclick="document.getElementById('${targetId}').value = '${s}'" 
+                        oncontextmenu="event.preventDefault(); window.deleteSourceTag('${s}')"
+                        title="Right-click to delete"
+                        class="flex-1 text-left">
+                        ${s}
+                    </button>
+                </div>
             `;
 
             if (taskChipsContainer) {
-                taskChipsContainer.innerHTML = sources.map(s => chipHTML(s, 'new-task-source')).join('');
+                taskChipsContainer.innerHTML = state.sources.map(s => chipHTML(s, 'new-task-source')).join('');
+                if (window.Sortable) {
+                    new Sortable(taskChipsContainer, {
+                        animation: 150,
+                        handle: '.chip-drag-handle',
+                        ghostClass: 'opacity-50',
+                        onEnd: function() {
+                            state.sources = Array.from(taskChipsContainer.children).map(el => el.dataset.source);
+                            saveData();
+                        }
+                    });
+                }
             }
 
             if (meetingChipsContainer) {
-                meetingChipsContainer.innerHTML = sources.map(s => chipHTML(s, 'meeting-source')).join('');
+                meetingChipsContainer.innerHTML = state.sources.map(s => chipHTML(s, 'meeting-source')).join('');
+                if (window.Sortable) {
+                    new Sortable(meetingChipsContainer, {
+                        animation: 150,
+                        handle: '.chip-drag-handle',
+                        ghostClass: 'opacity-50',
+                        onEnd: function() {
+                            state.sources = Array.from(meetingChipsContainer.children).map(el => el.dataset.source);
+                            saveData();
+                        }
+                    });
+                }
             }
+            safeCreateIcons();
         }
 
         window.openMeetingModal = (info = null, existingMeeting = null) => {
@@ -1655,17 +1740,47 @@
             if (!isOfflineMode && db) {
                 try {
                     const docSnap = await db.collection('users').doc(uid).get();
-                    if (docSnap.exists) { const data = docSnap.data(); state.habits = (data.habits || []).map(h => ({...h, type: h.type || 'good'})); state.gratitudeLogs = data.gratitudeLogs || []; state.tasks = data.tasks || []; state.stats = data.stats || INITIAL_STATS; } 
-                    else { if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.tasks = localData.tasks || []; state.stats = localData.stats || INITIAL_STATS; } await db.collection('users').doc(uid).set({ habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, stats: state.stats }, { merge: true }); }
-                } catch (e) { if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.tasks = localData.tasks || []; state.stats = localData.stats || INITIAL_STATS; } }
-            } else if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.tasks = localData.tasks || []; state.stats = localData.stats || INITIAL_STATS; }
+                    if (docSnap.exists) { 
+                        const data = docSnap.data(); 
+                        state.habits = (data.habits || []).map(h => ({...h, type: h.type || 'good'})); 
+                        state.gratitudeLogs = data.gratitudeLogs || []; 
+                        state.tasks = data.tasks || []; 
+                        state.sources = data.sources || [];
+                        state.stats = data.stats || INITIAL_STATS; 
+                    } 
+                    else { 
+                        if(localData) { 
+                            state.habits = localData.habits || []; 
+                            state.gratitudeLogs = localData.gratitudeLogs || []; 
+                            state.tasks = localData.tasks || []; 
+                            state.sources = localData.sources || [];
+                            state.stats = localData.stats || INITIAL_STATS; 
+                        } 
+                        await db.collection('users').doc(uid).set({ habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, sources: state.sources, stats: state.stats }, { merge: true }); 
+                    }
+                } catch (e) { 
+                    if(localData) { 
+                        state.habits = localData.habits || []; 
+                        state.gratitudeLogs = localData.gratitudeLogs || []; 
+                        state.tasks = localData.tasks || []; 
+                        state.sources = localData.sources || [];
+                        state.stats = localData.stats || INITIAL_STATS; 
+                    } 
+                }
+            } else if(localData) { 
+                state.habits = localData.habits || []; 
+                state.gratitudeLogs = localData.gratitudeLogs || []; 
+                state.tasks = localData.tasks || []; 
+                state.sources = localData.sources || [];
+                state.stats = localData.stats || INITIAL_STATS; 
+            }
             renderAll();
             if (calendarInstance && state.ui.activeTab === 'tasks') {
                 setTimeout(() => calendarInstance.render(), 100);
             }
         }
         async function saveData() {
-            const dataToSave = { habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, stats: state.stats };
+            const dataToSave = { habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, sources: state.sources, stats: state.stats };
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
             if (!isOfflineMode && state.user && state.user.uid !== 'offline_user' && db) {
                 document.getElementById('saving-indicator').classList.remove('hidden');
