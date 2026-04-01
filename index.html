@@ -630,7 +630,7 @@
                 notes: notes.trim(),
                 source: source.trim(),
                 difficulty: difficulty,
-                date: date !== null && date !== undefined ? date : (state.ui.newTaskDate || ''),
+                date: (date && date !== '') ? date : (state.ui.newTaskDate || '2030-05-13'),
                 type: type,
                 startTime: startTime,
                 endTime: endTime,
@@ -1644,6 +1644,26 @@
             window.addEventListener('resize', () => {
                 if (calendarInstance && state.ui.currentTab === 'tasks') {
                     calendarInstance.render();
+                }
+            });
+
+            // Close expanded task when clicking outside
+            document.addEventListener('click', (e) => {
+                if (state.ui.expandedTaskId) {
+                    // If clicking on any task item, let the task's own click handlers deal with it
+                    if (e.target.closest('.task-item')) return;
+
+                    const expandedEl = document.getElementById(`task-el-${state.ui.expandedTaskId}`);
+                    // Check if click was outside the expanded task element
+                    if (expandedEl && !expandedEl.contains(e.target)) {
+                        // Also check if we're not clicking on a modal or other UI that should be ignored
+                        const isModal = e.target.closest('#meeting-modal, #habit-modal, .fc-popover, .modal-content');
+                        if (!isModal) {
+                            state.ui.expandedTaskId = null;
+                            renderTasks();
+                            saveData();
+                        }
+                    }
                 }
             });
 
