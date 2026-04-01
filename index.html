@@ -830,7 +830,7 @@
             if (calendarEl && window.FullCalendar) {
                 calendarInstance = new FullCalendar.Calendar(calendarEl, {
                     initialView: 'timeGridWeek',
-                    scrollTime: '11:00:00',
+                    scrollTime: '09:00:00',
                     headerToolbar: false,
                     height: '100%',
                     events: [],
@@ -983,15 +983,20 @@
                         <div onclick="event.stopPropagation(); window.toggleTask('${task.id}')" class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isCompleted ? 'border-[#10b981] bg-[#10b981]/20' : 'border-slate-600 hover:border-[#ff6b35]'}">
                             ${isCompleted ? '<i data-lucide="check" class="w-3 h-3 text-[#10b981]"></i>' : (isMeeting ? '<i data-lucide="users" class="w-3 h-3 text-slate-400"></i>' : '')}
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <h4 class="text-sm font-medium ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-200'} truncate">${task.title}</h4>
-                        </div>
-                        <div class="flex items-center gap-2 flex-shrink-0">
-                            ${task.source ? `
+                        
+                        ${task.source ? `
+                        <div class="flex-shrink-0">
                             <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider">
                                 ${task.source}
                             </span>
-                            ` : ''}
+                        </div>
+                        ` : ''}
+
+                        <div class="flex-1 min-w-0">
+                            <h4 class="text-sm font-medium ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-200'} truncate">${task.title}</h4>
+                        </div>
+
+                        <div class="flex items-center gap-2 flex-shrink-0">
                             ${!isMeeting ? `
                             <span class="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${diffColor}">
                                 ${diffMap[task.difficulty || 'medium']}
