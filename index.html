@@ -580,7 +580,7 @@
                 navTasks.className = "px-4 py-1.5 rounded-md text-sm font-bold bg-[#ff6b35] text-white shadow-sm transition-all";
                 navHabits.className = "px-4 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white transition-all";
                 if (calendarInstance) {
-                    setTimeout(() => calendarInstance.render(), 10);
+                    setTimeout(() => calendarInstance.render(), 100);
                 }
             }
         };
@@ -725,7 +725,12 @@
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('dashboard-screen').classList.add('hidden');
             if (screenName === 'login') document.getElementById('login-screen').classList.remove('hidden');
-            if (screenName === 'dashboard') document.getElementById('dashboard-screen').classList.remove('hidden');
+            if (screenName === 'dashboard') {
+                document.getElementById('dashboard-screen').classList.remove('hidden');
+                if (calendarInstance && state.ui.currentTab === 'tasks') {
+                    setTimeout(() => calendarInstance.render(), 100);
+                }
+            }
         }
         function addGratitude() {
             if(!window.dateFns) return;
@@ -748,7 +753,12 @@
             saveData();
         }
 
-        function renderAll() { renderStats(); renderDate(); renderHabits(); renderHeatmap(); renderGratitude(); renderTasks(); updateCalendarEvents(); safeCreateIcons(); }
+        function renderAll() { 
+            renderStats(); renderDate(); renderHabits(); renderHeatmap(); renderGratitude(); renderTasks(); updateCalendarEvents(); safeCreateIcons(); 
+            if (calendarInstance && state.ui.activeTab === 'tasks') {
+                setTimeout(() => calendarInstance.render(), 100);
+            }
+        }
         
         function updateCalendarEvents() {
             if (!calendarInstance) return;
@@ -772,8 +782,8 @@
                     start: start,
                     end: end,
                     allDay: !hasTime,
-                    backgroundColor: t.completed ? '#334155' : (isMeeting ? 'transparent' : '#2563eb'),
-                    textColor: t.completed ? '#94a3b8' : (isMeeting ? '#f8fafc' : '#ffffff'),
+                    backgroundColor: t.completed ? '#334155' : (isMeeting ? 'transparent' : 'rgba(255, 107, 53, 0.2)'),
+                    textColor: t.completed ? '#94a3b8' : (isMeeting ? '#f8fafc' : '#ff6b35'),
                     borderColor: t.completed ? 'transparent' : 'transparent',
                     extendedProps: {
                         isMeeting: isMeeting,
@@ -1541,6 +1551,12 @@
             initNewTaskOptions();
             try { if (typeof firebase !== 'undefined') { app = firebase.initializeApp(firebaseConfig); auth = firebase.auth(); db = firebase.firestore(); } else { isOfflineMode = true; } } catch (e) { isOfflineMode = true; }
 
+            window.addEventListener('resize', () => {
+                if (calendarInstance && state.ui.currentTab === 'tasks') {
+                    calendarInstance.render();
+                }
+            });
+
             const handleEnterToSave = (e) => {
                 if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
                     e.preventDefault();
@@ -1644,6 +1660,9 @@
                 } catch (e) { if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.tasks = localData.tasks || []; state.stats = localData.stats || INITIAL_STATS; } }
             } else if(localData) { state.habits = localData.habits || []; state.gratitudeLogs = localData.gratitudeLogs || []; state.tasks = localData.tasks || []; state.stats = localData.stats || INITIAL_STATS; }
             renderAll();
+            if (calendarInstance && state.ui.activeTab === 'tasks') {
+                setTimeout(() => calendarInstance.render(), 100);
+            }
         }
         async function saveData() {
             const dataToSave = { habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, stats: state.stats };
