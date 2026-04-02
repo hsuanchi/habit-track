@@ -461,18 +461,21 @@
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Title</label>
                     <input type="text" id="meeting-title" placeholder="Meeting title..." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
                 </div>
+                <div class="flex items-center gap-2 mb-2">
+                    <input type="checkbox" id="meeting-allday" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-[#a855f7] focus:ring-[#a855f7] focus:ring-offset-slate-900">
+                    <label for="meeting-allday" class="text-sm font-bold text-slate-300 cursor-pointer">All Day Event</label>
+                </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Date</label>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Start Date</label>
                         <input type="date" id="meeting-date" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Source / Tag</label>
-                        <input type="text" id="meeting-source" placeholder="e.g., Project A" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
-                        <div id="meeting-source-chips" class="flex flex-wrap gap-1.5 mt-2"></div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">End Date (Optional)</label>
+                        <input type="date" id="meeting-end-date" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-2 gap-4" id="meeting-time-container">
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Start Time</label>
                         <input type="time" id="meeting-start" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
@@ -481,6 +484,11 @@
                         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">End Time</label>
                         <input type="time" id="meeting-end" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
                     </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Source / Tag</label>
+                    <input type="text" id="meeting-source" placeholder="e.g., Project A" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
+                    <div id="meeting-source-chips" class="flex flex-wrap gap-1.5 mt-2"></div>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Notes</label>
@@ -519,6 +527,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
     <script>
         const firebaseConfig = {
@@ -622,7 +633,7 @@
             }
         };
 
-        window.addTask = (title, source = '', difficulty = 'medium', date = null, type = 'task', startTime = '', endTime = '', notes = '') => {
+        window.addTask = (title, source = '', difficulty = 'medium', date = null, type = 'task', startTime = '', endTime = '', notes = '', endDate = null, allDay = false) => {
             if (!title.trim()) return;
             const newTask = {
                 id: crypto.randomUUID(),
@@ -631,6 +642,8 @@
                 source: source.trim(),
                 difficulty: difficulty,
                 date: (date && date !== '') ? date : (state.ui.newTaskDate || '2030-05-13'),
+                endDate: endDate,
+                allDay: allDay,
                 type: type,
                 startTime: startTime,
                 endTime: endTime,
@@ -778,16 +791,23 @@
             if (!calendarInstance) return;
             const events = state.tasks.filter(t => t.date).map(t => {
                 const isMeeting = t.type === 'meeting';
-                const hasTime = isMeeting && t.startTime;
+                const isAllDay = t.allDay || (!t.startTime);
                 
                 let start = t.date;
-                if (hasTime) {
+                if (!isAllDay && t.startTime) {
                     start = `${t.date}T${t.startTime}`;
                 }
                 
                 let end = null;
-                if (hasTime && t.endTime) {
-                    end = `${t.date}T${t.endTime}`;
+                if (!isAllDay && t.endTime) {
+                    // If it has an end date, use it, otherwise use start date
+                    const endDateStr = t.endDate || t.date;
+                    end = `${endDateStr}T${t.endTime}`;
+                } else if (isAllDay && t.endDate) {
+                    // FullCalendar allDay events need exclusive end date
+                    const endDate = new Date(t.endDate);
+                    endDate.setDate(endDate.getDate() + 1);
+                    end = window.dateFns ? window.dateFns.format(endDate, 'yyyy-MM-dd') : t.endDate;
                 }
 
                 return {
@@ -795,10 +815,10 @@
                     title: t.title,
                     start: start,
                     end: end,
-                    allDay: !hasTime,
+                    allDay: isAllDay,
                     backgroundColor: t.completed ? '#334155' : (isMeeting ? 'transparent' : 'rgba(255, 107, 53, 0.2)'),
-                    textColor: t.completed ? '#94a3b8' : (isMeeting ? '#f8fafc' : '#ff6b35'),
-                    borderColor: t.completed ? 'transparent' : 'transparent',
+                    textColor: t.completed ? '#94a3b8' : (isMeeting ? '#ffffff' : '#ff6b35'),
+                    borderColor: t.completed ? 'transparent' : (isMeeting ? '#ffffff' : 'transparent'),
                     extendedProps: {
                         isMeeting: isMeeting,
                         completed: t.completed,
@@ -1044,7 +1064,11 @@
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Date</label>
-                            <input type="date" value="${task.date}" onblur="window.updateTask('${task.id}', 'date', this.value)" onchange="window.updateTask('${task.id}', 'date', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
+                            <div class="flex gap-2 items-center flex-wrap">
+                                <button type="button" onclick="window.updateTask('${task.id}', 'date', window.dateFns.format(new Date(), 'yyyy-MM-dd'))" class="px-2 py-1.5 rounded-md text-xs font-bold border border-slate-700 text-slate-400 hover:text-white transition-colors">Today</button>
+                                <button type="button" onclick="window.updateTask('${task.id}', 'date', window.dateFns.format(window.dateFns.addDays(new Date(), 1), 'yyyy-MM-dd'))" class="px-2 py-1.5 rounded-md text-xs font-bold border border-slate-700 text-slate-400 hover:text-white transition-colors">Tomorrow</button>
+                                <input type="date" value="${task.date}" onblur="window.updateTask('${task.id}', 'date', this.value)" onchange="window.updateTask('${task.id}', 'date', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none min-w-[120px]">
+                            </div>
                         </div>
                         <div class="flex justify-end pt-2 gap-2">
                             <button onclick="window.deleteTask('${task.id}')" class="text-xs font-bold text-rose-500 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
@@ -1537,8 +1561,11 @@
             document.getElementById('meeting-source').value = '';
             document.getElementById('meeting-notes').value = '';
             document.getElementById('meeting-date').value = dateFns.format(new Date(), 'yyyy-MM-dd');
+            document.getElementById('meeting-end-date').value = '';
             document.getElementById('meeting-start').value = '';
             document.getElementById('meeting-end').value = '';
+            document.getElementById('meeting-allday').checked = false;
+            document.getElementById('meeting-time-container').classList.remove('hidden');
             
             document.getElementById('btn-delete-meeting').classList.add('hidden');
             document.getElementById('meeting-modal-title').innerHTML = '<i data-lucide="calendar-plus" class="w-5 h-5 text-[#a855f7]"></i> New Meeting';
@@ -1549,8 +1576,13 @@
                 document.getElementById('meeting-source').value = existingMeeting.source || '';
                 document.getElementById('meeting-notes').value = existingMeeting.notes || '';
                 document.getElementById('meeting-date').value = existingMeeting.date;
+                document.getElementById('meeting-end-date').value = existingMeeting.endDate || '';
                 document.getElementById('meeting-start').value = existingMeeting.startTime || '';
                 document.getElementById('meeting-end').value = existingMeeting.endTime || '';
+                document.getElementById('meeting-allday').checked = !!existingMeeting.allDay;
+                if (existingMeeting.allDay) {
+                    document.getElementById('meeting-time-container').classList.add('hidden');
+                }
                 document.getElementById('btn-delete-meeting').classList.remove('hidden');
                 document.getElementById('meeting-modal-title').innerHTML = '<i data-lucide="calendar-edit" class="w-5 h-5 text-[#a855f7]"></i> Edit Meeting';
             } else if (info) {
@@ -1565,6 +1597,12 @@
                         document.getElementById('meeting-end').value = dateFns.format(endDate, 'HH:mm');
                     } else {
                         document.getElementById('meeting-date').value = info.dateStr;
+                        if (info.endStr && info.endStr !== info.dateStr) {
+                            // FullCalendar select gives end date as exclusive, so subtract 1 day for inclusive UI
+                            const endDate = new Date(info.endStr);
+                            endDate.setDate(endDate.getDate() - 1);
+                            document.getElementById('meeting-end-date').value = dateFns.format(endDate, 'yyyy-MM-dd');
+                        }
                     }
                 }
             }
@@ -1594,8 +1632,10 @@
             const source = document.getElementById('meeting-source').value;
             const notes = document.getElementById('meeting-notes').value;
             const date = document.getElementById('meeting-date').value;
-            const startTime = document.getElementById('meeting-start').value;
-            const endTime = document.getElementById('meeting-end').value;
+            const endDate = document.getElementById('meeting-end-date').value;
+            const allDay = document.getElementById('meeting-allday').checked;
+            const startTime = allDay ? '' : document.getElementById('meeting-start').value;
+            const endTime = allDay ? '' : document.getElementById('meeting-end').value;
 
             if (!title.trim()) {
                 alert('Please enter a meeting title');
@@ -1610,12 +1650,14 @@
                     meeting.source = source;
                     meeting.notes = notes;
                     meeting.date = date;
+                    meeting.endDate = endDate;
+                    meeting.allDay = allDay;
                     meeting.startTime = startTime;
                     meeting.endTime = endTime;
                 }
             } else {
                 // Create new
-                window.addTask(title, source, 'medium', date, 'meeting', startTime, endTime, notes);
+                window.addTask(title, source, 'medium', date, 'meeting', startTime, endTime, notes, endDate, allDay);
             }
 
             window.renderTasks();
@@ -1639,6 +1681,16 @@
             safeCreateIcons();
             initCalendar();
             initNewTaskOptions();
+            
+            // Meeting modal all-day toggle
+            document.getElementById('meeting-allday')?.addEventListener('change', (e) => {
+                const timeContainer = document.getElementById('meeting-time-container');
+                if (e.target.checked) {
+                    timeContainer.classList.add('hidden');
+                } else {
+                    timeContainer.classList.remove('hidden');
+                }
+            });
             try { if (typeof firebase !== 'undefined') { app = firebase.initializeApp(firebaseConfig); auth = firebase.auth(); db = firebase.firestore(); } else { isOfflineMode = true; } } catch (e) { isOfflineMode = true; }
 
             window.addEventListener('resize', () => {
@@ -1755,53 +1807,103 @@
                         showScreen('login'); 
                     } 
                 }); 
+            } else {
+                // No auth and not offline mode
+                setTimeout(() => { 
+                    document.getElementById('loading-overlay').classList.add('hidden'); 
+                    showScreen('login'); 
+                }, 1000);
             }
-            setTimeout(() => { document.getElementById('loading-overlay').classList.add('hidden'); if(!state.user && document.getElementById('dashboard-screen').classList.contains('hidden')) { document.getElementById('login-screen').classList.remove('hidden'); } }, 1000);
         });
 
+        let unsubscribeUser = null;
         async function loadUserData(uid) {
             let localData = null;
             try { localData = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)); } catch (e) {}
+            
             if (!isOfflineMode && db) {
-                try {
-                    const docSnap = await db.collection('users').doc(uid).get();
-                    if (docSnap.exists) { 
-                        const data = docSnap.data(); 
-                        state.habits = (data.habits || []).map(h => ({...h, type: h.type || 'good'})); 
-                        state.gratitudeLogs = data.gratitudeLogs || []; 
-                        state.tasks = data.tasks || []; 
-                        state.sources = data.sources || [];
-                        state.stats = data.stats || INITIAL_STATS; 
-                    } 
-                    else { 
+                return new Promise((resolve) => {
+                    let isFirstLoad = true;
+                    if (unsubscribeUser) unsubscribeUser();
+                    
+                    unsubscribeUser = db.collection('users').doc(uid).onSnapshot((docSnap) => {
+                        if (docSnap.exists) { 
+                            const data = docSnap.data(); 
+                            
+                            const newData = {
+                                habits: (data.habits || []).map(h => ({...h, type: h.type || 'good'})),
+                                gratitudeLogs: data.gratitudeLogs || [],
+                                tasks: data.tasks || [],
+                                sources: data.sources || [],
+                                stats: data.stats || INITIAL_STATS
+                            };
+                            
+                            const currentState = {
+                                habits: state.habits,
+                                gratitudeLogs: state.gratitudeLogs,
+                                tasks: state.tasks,
+                                sources: state.sources,
+                                stats: state.stats
+                            };
+                            
+                            if (!isFirstLoad && JSON.stringify(newData) === JSON.stringify(currentState)) {
+                                return; // No actual changes, skip re-render to prevent focus loss
+                            }
+                            
+                            state.habits = newData.habits; 
+                            state.gratitudeLogs = newData.gratitudeLogs; 
+                            state.tasks = newData.tasks; 
+                            state.sources = newData.sources;
+                            state.stats = newData.stats; 
+                            
+                            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newData));
+                            
+                            renderAll();
+                            if (calendarInstance && state.ui.activeTab === 'tasks') {
+                                setTimeout(() => calendarInstance.render(), 100);
+                            }
+                        } 
+                        else { 
+                            if(localData) { 
+                                state.habits = localData.habits || []; 
+                                state.gratitudeLogs = localData.gratitudeLogs || []; 
+                                state.tasks = localData.tasks || []; 
+                                state.sources = localData.sources || [];
+                                state.stats = localData.stats || INITIAL_STATS; 
+                            } 
+                            db.collection('users').doc(uid).set({ habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, sources: state.sources, stats: state.stats }, { merge: true }); 
+                        }
+                        
+                        if (isFirstLoad) {
+                            isFirstLoad = false;
+                            resolve();
+                        }
+                    }, (error) => {
+                        console.error("Firestore sync error:", error);
                         if(localData) { 
                             state.habits = localData.habits || []; 
                             state.gratitudeLogs = localData.gratitudeLogs || []; 
                             state.tasks = localData.tasks || []; 
                             state.sources = localData.sources || [];
                             state.stats = localData.stats || INITIAL_STATS; 
-                        } 
-                        await db.collection('users').doc(uid).set({ habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, sources: state.sources, stats: state.stats }, { merge: true }); 
-                    }
-                } catch (e) { 
-                    if(localData) { 
-                        state.habits = localData.habits || []; 
-                        state.gratitudeLogs = localData.gratitudeLogs || []; 
-                        state.tasks = localData.tasks || []; 
-                        state.sources = localData.sources || [];
-                        state.stats = localData.stats || INITIAL_STATS; 
-                    } 
-                }
+                            renderAll();
+                        }
+                        if (isFirstLoad) {
+                            isFirstLoad = false;
+                            resolve();
+                        }
+                    });
+                });
             } else if(localData) { 
                 state.habits = localData.habits || []; 
                 state.gratitudeLogs = localData.gratitudeLogs || []; 
                 state.tasks = localData.tasks || []; 
                 state.sources = localData.sources || [];
                 state.stats = localData.stats || INITIAL_STATS; 
-            }
-            renderAll();
-            if (calendarInstance && state.ui.activeTab === 'tasks') {
-                setTimeout(() => calendarInstance.render(), 100);
+                renderAll();
+                if (calendarInstance && state.ui.activeTab === 'tasks') {
+                    setTimeout(() => calendarInstance.render(), 100);
+                }
             }
         }
         async function saveData() {
@@ -1809,9 +1911,44 @@
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
             if (!isOfflineMode && state.user && state.user.uid !== 'offline_user' && db) {
                 document.getElementById('saving-indicator').classList.remove('hidden');
-                try { await db.collection('users').doc(state.user.uid).set(dataToSave, { merge: true }); } catch (e) { console.error(e); }
+                try { 
+                    await db.collection('users').doc(state.user.uid).set(dataToSave, { merge: true }); 
+                    showToast('Data saved successfully', 'success');
+                } catch (e) { 
+                    console.error(e); 
+                    showToast('Failed to save data', 'error');
+                }
                 finally { setTimeout(() => document.getElementById('saving-indicator').classList.add('hidden'), 500); }
             }
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-red-500/20 border-red-500/50 text-red-400';
+            const icon = type === 'success' ? 'check-circle' : 'alert-circle';
+            
+            toast.className = `flex items-center gap-2 px-4 py-3 rounded-xl border ${bgColor} backdrop-blur-md shadow-lg transform transition-all duration-300 translate-y-4 opacity-0`;
+            toast.innerHTML = `
+                <i data-lucide="${icon}" class="w-4 h-4"></i>
+                <span class="text-sm font-bold">${message}</span>
+            `;
+            
+            container.appendChild(toast);
+            if (window.lucide) window.lucide.createIcons({ root: toast });
+
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-4', 'opacity-0');
+            });
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.add('translate-y-4', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
     </script>
 <script type="module" src="/index.tsx"></script>
