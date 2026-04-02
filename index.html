@@ -179,10 +179,6 @@
 
                 <!-- Simple Level & Stats -->
                 <div class="w-auto flex justify-end items-center gap-3 sm:gap-6 shrink-0">
-                     <div id="saving-indicator" class="hidden text-[#ff6b35] animate-pulse">
-                        <i data-lucide="save" class="w-4 h-4"></i>
-                    </div>
-
                     <div class="flex items-center gap-6">
                         <!-- Level / XP Simple -->
                         <div class="flex flex-col items-end">
@@ -529,6 +525,12 @@
     </div>
 
     <!-- Toast Container -->
+    <!-- Saving Indicator -->
+    <div id="saving-indicator" class="fixed bottom-6 right-6 z-[100] hidden items-center gap-2 px-4 py-2 rounded-full bg-[#1e293b]/90 border border-[#334155] text-[#ff6b35] backdrop-blur-md shadow-lg pointer-events-none transition-all duration-300">
+        <i data-lucide="save" class="w-4 h-4 animate-pulse"></i>
+        <span class="text-xs font-bold tracking-wider">SAVING...</span>
+    </div>
+
     <div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
     <script>
@@ -668,11 +670,6 @@
             const task = state.tasks.find(t => t.id === id);
             if (task) {
                 task.completed = !task.completed;
-                if (task.completed) {
-                    updateStats(20, 'MIND', 1); // Reward for completing a task
-                } else {
-                    updateStats(-20, 'MIND', -1);
-                }
                 renderTasks();
                 updateCalendarEvents();
                 saveData();
@@ -1906,20 +1903,50 @@
                 }
             }
         }
+        let saveTimeout = null;
+        let pendingSaveData = null;
+
+        window.addEventListener('beforeunload', () => {
+            if (pendingSaveData && !isOfflineMode && state.user && state.user.uid !== 'offline_user' && db) {
+                db.collection('users').doc(state.user.uid).set(pendingSaveData, { merge: true });
+            }
+        });
+
         async function saveData() {
             const dataToSave = { habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, sources: state.sources, stats: state.stats };
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
-            if (!isOfflineMode && state.user && state.user.uid !== 'offline_user' && db) {
-                document.getElementById('saving-indicator').classList.remove('hidden');
-                try { 
-                    await db.collection('users').doc(state.user.uid).set(dataToSave, { merge: true }); 
-                    showToast('Data saved successfully', 'success');
-                } catch (e) { 
-                    console.error(e); 
-                    showToast('Failed to save data', 'error');
-                }
-                finally { setTimeout(() => document.getElementById('saving-indicator').classList.add('hidden'), 500); }
+            
+            pendingSaveData = dataToSave;
+            const indicator = document.getElementById('saving-indicator');
+            if (indicator) {
+                indicator.classList.remove('hidden');
+                indicator.classList.add('flex');
             }
+            
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+            }
+            
+            saveTimeout = setTimeout(async () => {
+                if (!pendingSaveData) return;
+                const data = pendingSaveData;
+                pendingSaveData = null;
+                saveTimeout = null;
+                
+                try { 
+                    if (!isOfflineMode && state.user && state.user.uid !== 'offline_user' && db) {
+                        await db.collection('users').doc(state.user.uid).set(data, { merge: true }); 
+                    }
+                } catch (e) { 
+                    console.error("Save error:", e); 
+                }
+                finally { 
+                    if (indicator) {
+                        indicator.classList.add('hidden');
+                        indicator.classList.remove('flex');
+                    }
+                }
+            }, 500); // Debounce for 0.5 seconds
         }
 
         function showToast(message, type = 'success') {
