@@ -530,6 +530,12 @@
         <i data-lucide="save" class="w-4 h-4 animate-pulse"></i>
         <span class="text-xs font-bold tracking-wider">SAVING...</span>
     </div>
+    
+    <!-- Last Modified Indicator -->
+    <div id="last-modified-indicator" class="fixed bottom-6 left-6 z-[90] hidden items-center gap-2 px-3 py-1.5 rounded-full bg-[#1e293b]/60 border border-[#334155]/50 text-slate-400 backdrop-blur-sm pointer-events-none transition-all duration-300">
+        <i data-lucide="clock" class="w-3 h-3"></i>
+        <span class="text-[10px] font-medium tracking-wide" id="last-modified-text"></span>
+    </div>
 
     <div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
@@ -560,6 +566,7 @@
             tasks: [],
             sources: [], // Persisted order of tags
             stats: { ...INITIAL_STATS },
+            lastModified: Date.now(),
             ui: {
                 selectedDate: new Date(),
                 viewDate: new Date(),
@@ -1791,9 +1798,16 @@
                 loadUserData("offline_user"); 
                 showScreen('dashboard'); 
             } else if (!isOfflineMode && auth) { 
+                // Ensure persistence is set to LOCAL so session survives tab closes
+                if (auth.setPersistence) {
+                    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(console.error);
+                }
+                
                 auth.onAuthStateChanged(async (user) => { 
                     if (user && !checkExpiry()) { 
-                        localStorage.setItem('login_timestamp', Date.now().toString()); // Rolling 14 days
+                        // If there's no login_timestamp but we have a user, it means they just logged in or we are recovering a session.
+                        // Set the timestamp to now to start the 14-day rolling window.
+                        localStorage.setItem('login_timestamp', Date.now().toString()); 
                         state.user = user; 
                         document.getElementById('user-display-name').innerText = user.displayName || "Hero"; 
                         await loadUserData(user.uid); 
@@ -1824,24 +1838,33 @@
                     if (unsubscribeUser) unsubscribeUser();
                     
                     unsubscribeUser = db.collection('users').doc(uid).onSnapshot((docSnap) => {
-                        if (docSnap.exists) { 
-                            const data = docSnap.data(); 
-                            
-                            const newData = {
-                                habits: (data.habits || []).map(h => ({...h, type: h.type || 'good'})),
-                                gratitudeLogs: data.gratitudeLogs || [],
-                                tasks: data.tasks || [],
-                                sources: data.sources || [],
-                                stats: data.stats || INITIAL_STATS
-                            };
-                            
-                            const currentState = {
-                                habits: state.habits,
-                                gratitudeLogs: state.gratitudeLogs,
-                                tasks: state.tasks,
-                                sources: state.sources,
-                                stats: state.stats
-                            };
+                        let data = docSnap.exists ? docSnap.data() : {};
+                        
+                        // If local data is newer (e.g. user closed tab before Firestore save completed), use it and sync it
+                        if (localData && localData.lastModified && (!data.lastModified || localData.lastModified > data.lastModified)) {
+                            data = localData;
+                            db.collection('users').doc(uid).set(data, { merge: true });
+                        }
+                        
+                        const newData = {
+                            habits: (data.habits || []).map(h => ({...h, type: h.type || 'good'})),
+                            gratitudeLogs: data.gratitudeLogs || [],
+                            tasks: data.tasks || [],
+                            sources: data.sources || [],
+                            stats: data.stats || INITIAL_STATS,
+                            lastModified: data.lastModified || Date.now()
+                        };
+                        
+                        updateLastModifiedUI(newData.lastModified);
+                        
+                        const currentState = {
+                            habits: state.habits,
+                            gratitudeLogs: state.gratitudeLogs,
+                            tasks: state.tasks,
+                            sources: state.sources,
+                            stats: state.stats,
+                            lastModified: state.lastModified
+                        };
                             
                             if (!isFirstLoad && JSON.stringify(newData) === JSON.stringify(currentState)) {
                                 return; // No actual changes, skip re-render to prevent focus loss
@@ -1852,6 +1875,7 @@
                             state.tasks = newData.tasks; 
                             state.sources = newData.sources;
                             state.stats = newData.stats; 
+                            state.lastModified = newData.lastModified;
                             
                             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newData));
                             
@@ -1859,17 +1883,10 @@
                             if (calendarInstance && state.ui.activeTab === 'tasks') {
                                 setTimeout(() => calendarInstance.render(), 100);
                             }
-                        } 
-                        else { 
-                            if(localData) { 
-                                state.habits = localData.habits || []; 
-                                state.gratitudeLogs = localData.gratitudeLogs || []; 
-                                state.tasks = localData.tasks || []; 
-                                state.sources = localData.sources || [];
-                                state.stats = localData.stats || INITIAL_STATS; 
-                            } 
-                            db.collection('users').doc(uid).set({ habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, sources: state.sources, stats: state.stats }, { merge: true }); 
-                        }
+                            
+                            if (!docSnap.exists && !localData) { 
+                                db.collection('users').doc(uid).set({ habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, sources: state.sources, stats: state.stats, lastModified: state.lastModified }, { merge: true }); 
+                            }
                         
                         if (isFirstLoad) {
                             isFirstLoad = false;
@@ -1891,12 +1908,18 @@
                         }
                     });
                 });
-            } else if(localData) { 
-                state.habits = localData.habits || []; 
-                state.gratitudeLogs = localData.gratitudeLogs || []; 
-                state.tasks = localData.tasks || []; 
-                state.sources = localData.sources || [];
-                state.stats = localData.stats || INITIAL_STATS; 
+            } else { 
+                if (localData) {
+                    state.habits = localData.habits || []; 
+                    state.gratitudeLogs = localData.gratitudeLogs || []; 
+                    state.tasks = localData.tasks || []; 
+                    state.sources = localData.sources || [];
+                    state.stats = localData.stats || INITIAL_STATS; 
+                    state.lastModified = localData.lastModified || Date.now();
+                } else {
+                    state.lastModified = Date.now();
+                }
+                updateLastModifiedUI(state.lastModified);
                 renderAll();
                 if (calendarInstance && state.ui.activeTab === 'tasks') {
                     setTimeout(() => calendarInstance.render(), 100);
@@ -1913,8 +1936,10 @@
         });
 
         async function saveData() {
-            const dataToSave = { habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, sources: state.sources, stats: state.stats };
+            state.lastModified = Date.now();
+            const dataToSave = { habits: state.habits, gratitudeLogs: state.gratitudeLogs, tasks: state.tasks, sources: state.sources, stats: state.stats, lastModified: state.lastModified };
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
+            updateLastModifiedUI(state.lastModified);
             
             pendingSaveData = dataToSave;
             const indicator = document.getElementById('saving-indicator');
@@ -1947,6 +1972,19 @@
                     }
                 }
             }, 500); // Debounce for 0.5 seconds
+        }
+
+        function updateLastModifiedUI(timestamp) {
+            if (!timestamp) return;
+            const indicator = document.getElementById('last-modified-indicator');
+            const textEl = document.getElementById('last-modified-text');
+            if (indicator && textEl) {
+                const date = new Date(timestamp);
+                const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                textEl.innerText = `Last saved: ${timeStr}`;
+                indicator.classList.remove('hidden');
+                indicator.classList.add('flex');
+            }
         }
 
         function showToast(message, type = 'success') {
