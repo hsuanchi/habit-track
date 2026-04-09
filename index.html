@@ -120,6 +120,13 @@
                 <p class="text-slate-400 text-sm">Turn your habits into an adventure.</p>
             </div>
 
+            <div id="iframe-warning" class="hidden mb-6 p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl text-orange-400 text-sm">
+                <div class="flex items-start gap-3">
+                    <i data-lucide="alert-triangle" class="w-5 h-5 flex-shrink-0 mt-0.5"></i>
+                    <p><strong>預覽模式提示：</strong> 由於瀏覽器的安全機制（阻擋第三方 Cookie），在預覽視窗中可能會遇到頻繁登出的問題。建議您點擊右上角的<strong>「在新分頁開啟」</strong>以獲得穩定的登入體驗。</p>
+                </div>
+            </div>
+
             <div id="auth-error" class="hidden mb-6 bg-red-500/10 border border-red-500/20 text-red-200 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
                 <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i> <span id="auth-error-text"></span>
             </div>
@@ -644,6 +651,7 @@
 
         window.addTask = (title, source = '', difficulty = 'medium', date = null, type = 'task', startTime = '', endTime = '', notes = '', endDate = null, allDay = false) => {
             if (!title.trim()) return;
+            const minOrder = state.tasks.length > 0 ? Math.min(...state.tasks.map(t => t.order || 0)) : 0;
             const newTask = {
                 id: crypto.randomUUID(),
                 title: title.trim(),
@@ -658,7 +666,7 @@
                 endTime: endTime,
                 completed: false,
                 createdAt: new Date().toISOString(),
-                order: state.tasks.length // Add order property
+                order: minOrder - 1 // Place new tasks at the top
             };
             state.tasks.push(newTask);
             
@@ -755,7 +763,13 @@
             document.getElementById('loading-overlay').classList.add('hidden');
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('dashboard-screen').classList.add('hidden');
-            if (screenName === 'login') document.getElementById('login-screen').classList.remove('hidden');
+            if (screenName === 'login') {
+                document.getElementById('login-screen').classList.remove('hidden');
+                // Check if running in iframe
+                if (window.self !== window.top) {
+                    document.getElementById('iframe-warning').classList.remove('hidden');
+                }
+            }
             if (screenName === 'dashboard') {
                 document.getElementById('dashboard-screen').classList.remove('hidden');
                 if (calendarInstance && state.ui.currentTab === 'tasks') {
@@ -1090,10 +1104,11 @@
                 return html;
             };
 
-            // Sort tasks: incomplete first, then by order property
+            // Sort tasks: incomplete first, then by order property, then by createdAt descending
             const sortedTasks = [...state.tasks].filter(t => t.type !== 'meeting').sort((a, b) => {
                 if (a.completed !== b.completed) return a.completed ? 1 : -1;
-                return (a.order || 0) - (b.order || 0);
+                if ((a.order || 0) !== (b.order || 0)) return (a.order || 0) - (b.order || 0);
+                return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
             });
 
             sortedTasks.forEach(task => {
@@ -1752,6 +1767,7 @@
                 state.habits.push({ id: crypto.randomUUID(), title, type: state.ui.modalType, stat: state.ui.selectedStat, xpReward: 10, statReward: 1, completedDates: [], streak: 0, createdAt: new Date().toISOString() });
                 saveData(); renderAll(); window.closeModal();
             });
+
             document.getElementById('btn-add-gratitude')?.addEventListener('click', addGratitude);
             document.getElementById('gratitude-input')?.addEventListener('keydown', (e) => {
                 // Change to Shift+Enter to submit
@@ -1760,18 +1776,9 @@
                     addGratitude();
                 }
             });
-            const checkExpiry = () => {
-                const loginTime = localStorage.getItem('login_timestamp');
-                if (loginTime && (Date.now() - parseInt(loginTime)) > 14 * 24 * 60 * 60 * 1000) {
-                    localStorage.removeItem('login_timestamp');
-                    localStorage.removeItem('offline_mode_active');
-                    return true;
-                }
-                return false;
-            };
 
-            document.getElementById('btn-logout')?.addEventListener('click', () => { localStorage.removeItem('login_timestamp'); localStorage.removeItem('offline_mode_active'); if (isOfflineMode) { state.user = null; isOfflineMode = false; showScreen('login'); window.location.reload(); } else { auth.signOut(); } });
-            document.getElementById('btn-offline-mode')?.addEventListener('click', () => { isOfflineMode = true; localStorage.setItem('offline_mode_active', 'true'); localStorage.setItem('login_timestamp', Date.now().toString()); state.user = { uid: "offline_user", email: "offline@hero.com", displayName: "Offline Hero" }; document.getElementById('user-display-name').innerText = "Offline Hero"; loadUserData("offline_user"); showScreen('dashboard'); });
+            document.getElementById('btn-logout')?.addEventListener('click', () => { localStorage.removeItem('offline_mode_active'); if (isOfflineMode) { state.user = null; isOfflineMode = false; showScreen('login'); window.location.reload(); } else { auth.signOut(); } });
+            document.getElementById('btn-offline-mode')?.addEventListener('click', () => { isOfflineMode = true; localStorage.setItem('offline_mode_active', 'true'); state.user = { uid: "offline_user", email: "offline@hero.com", displayName: "Offline Hero" }; document.getElementById('user-display-name').innerText = "Offline Hero"; loadUserData("offline_user"); showScreen('dashboard'); });
             
             const authForm = document.getElementById('auth-form');
             if(authForm) {
@@ -1784,39 +1791,30 @@
                     try { 
                         if (auth && auth.setPersistence) await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
                         if (isRegistering) { const cred = await auth.createUserWithEmailAndPassword(email, password); if (cred.user) await cred.user.updateProfile({ displayName: username }); } else { await auth.signInWithEmailAndPassword(email, password); } 
-                        localStorage.setItem('login_timestamp', Date.now().toString());
                     } catch (err) { alert(err.message); }
                 });
             }
             document.getElementById('btn-toggle-auth-mode')?.addEventListener('click', () => { const userField = document.getElementById('username-field'); const isHidden = userField.classList.contains('hidden'); userField.classList.toggle('hidden'); document.getElementById('btn-submit-auth').innerText = isHidden ? "Start Journey" : "Create Account"; document.getElementById('btn-toggle-auth-mode').innerText = isHidden ? "Create new account" : "Back to Login"; });
 
-            const isExpired = checkExpiry();
-            if (localStorage.getItem('offline_mode_active') === 'true' && !isExpired) {
+            if (localStorage.getItem('offline_mode_active') === 'true') {
                 isOfflineMode = true;
                 state.user = { uid: "offline_user", email: "offline@hero.com", displayName: "Offline Hero" }; 
                 document.getElementById('user-display-name').innerText = "Offline Hero"; 
                 loadUserData("offline_user"); 
                 showScreen('dashboard'); 
             } else if (!isOfflineMode && auth) { 
-                // Ensure persistence is set to LOCAL so session survives tab closes
-                if (auth.setPersistence) {
-                    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(console.error);
-                }
-                
                 auth.onAuthStateChanged(async (user) => { 
-                    if (user && !checkExpiry()) { 
-                        // If there's no login_timestamp but we have a user, it means they just logged in or we are recovering a session.
-                        // Set the timestamp to now to start the 14-day rolling window.
-                        localStorage.setItem('login_timestamp', Date.now().toString()); 
+                    if (user) { 
                         state.user = user; 
                         document.getElementById('user-display-name').innerText = user.displayName || "Hero"; 
                         await loadUserData(user.uid); 
                         showScreen('dashboard'); 
                     } else { 
-                        if (user) auth.signOut();
                         state.user = null; 
                         showScreen('login'); 
                     } 
+                }, (error) => {
+                    console.error("Auth state error:", error);
                 }); 
             } else {
                 // No auth and not offline mode
