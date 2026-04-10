@@ -488,6 +488,22 @@
                         <input type="time" id="meeting-end" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
                     </div>
                 </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Repeat</label>
+                        <select id="meeting-repeat" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors" onchange="document.getElementById('meeting-repeat-until-container').classList.toggle('hidden', this.value === 'none')">
+                            <option value="none">Does not repeat</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="yearly">Yearly</option>
+                        </select>
+                    </div>
+                    <div id="meeting-repeat-until-container" class="hidden">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Repeat Until</label>
+                        <input type="date" id="meeting-repeat-until" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
+                    </div>
+                </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Source / Tag</label>
                     <input type="text" id="meeting-source" placeholder="e.g., Project A" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
@@ -649,7 +665,7 @@
             }
         };
 
-        window.addTask = (title, source = '', difficulty = 'medium', date = null, type = 'task', startTime = '', endTime = '', notes = '', endDate = null, allDay = false) => {
+        window.addTask = (title, source = '', difficulty = 'medium', date = null, type = 'task', startTime = '', endTime = '', notes = '', endDate = null, allDay = false, recurrence = 'none', recurrenceUntil = '') => {
             if (!title.trim()) return;
             const minOrder = state.tasks.length > 0 ? Math.min(...state.tasks.map(t => t.order || 0)) : 0;
             const newTask = {
@@ -664,6 +680,8 @@
                 type: type,
                 startTime: startTime,
                 endTime: endTime,
+                recurrence: recurrence,
+                recurrenceUntil: recurrenceUntil,
                 completed: false,
                 createdAt: new Date().toISOString(),
                 order: minOrder - 1 // Place new tasks at the top
@@ -807,7 +825,9 @@
         
         function updateCalendarEvents() {
             if (!calendarInstance) return;
-            const events = state.tasks.filter(t => t.date).map(t => {
+            const events = [];
+            
+            state.tasks.filter(t => t.date).forEach(t => {
                 const isMeeting = t.type === 'meeting';
                 const isAllDay = t.allDay || (!t.startTime);
                 
@@ -818,17 +838,15 @@
                 
                 let end = null;
                 if (!isAllDay && t.endTime) {
-                    // If it has an end date, use it, otherwise use start date
                     const endDateStr = t.endDate || t.date;
                     end = `${endDateStr}T${t.endTime}`;
                 } else if (isAllDay && t.endDate) {
-                    // FullCalendar allDay events need exclusive end date
                     const endDate = new Date(t.endDate);
                     endDate.setDate(endDate.getDate() + 1);
                     end = window.dateFns ? window.dateFns.format(endDate, 'yyyy-MM-dd') : t.endDate;
                 }
-
-                return {
+                
+                const baseEvent = {
                     id: t.id,
                     title: t.title,
                     start: start,
@@ -845,7 +863,54 @@
                         endTime: t.endTime
                     }
                 };
+                
+                events.push(baseEvent);
+                
+                if (t.recurrence && t.recurrence !== 'none' && window.dateFns) {
+                    let currentDate = new Date(t.date);
+                    const limitDate = t.recurrenceUntil ? new Date(t.recurrenceUntil) : dateFns.addYears(new Date(), 2);
+                    const hardLimit = dateFns.addYears(new Date(), 2);
+                    const finalLimit = limitDate < hardLimit ? limitDate : hardLimit;
+                    
+                    let i = 0;
+                    while (currentDate <= finalLimit && i < 730) {
+                        i++;
+                        if (t.recurrence === 'daily') currentDate = dateFns.addDays(currentDate, 1);
+                        else if (t.recurrence === 'weekly') currentDate = dateFns.addWeeks(currentDate, 1);
+                        else if (t.recurrence === 'monthly') currentDate = dateFns.addMonths(currentDate, 1);
+                        else if (t.recurrence === 'yearly') currentDate = dateFns.addYears(currentDate, 1);
+                        
+                        if (currentDate > finalLimit) break;
+                        
+                        const dateStr = dateFns.format(currentDate, 'yyyy-MM-dd');
+                        let recStart = dateStr;
+                        if (!isAllDay && t.startTime) recStart = `${dateStr}T${t.startTime}`;
+                        
+                        let recEnd = null;
+                        if (!isAllDay && t.endTime) {
+                            const originalStartDate = new Date(t.date);
+                            const originalEndDate = new Date(t.endDate || t.date);
+                            const diffDays = dateFns.differenceInDays(originalEndDate, originalStartDate);
+                            const newEndDate = dateFns.addDays(currentDate, diffDays);
+                            recEnd = `${dateFns.format(newEndDate, 'yyyy-MM-dd')}T${t.endTime}`;
+                        } else if (isAllDay && t.endDate) {
+                            const originalStartDate = new Date(t.date);
+                            const originalEndDate = new Date(t.endDate);
+                            const diffDays = dateFns.differenceInDays(originalEndDate, originalStartDate);
+                            const newEndDate = dateFns.addDays(currentDate, diffDays + 1);
+                            recEnd = dateFns.format(newEndDate, 'yyyy-MM-dd');
+                        }
+                        
+                        events.push({
+                            ...baseEvent,
+                            id: `${t.id}_${dateStr}`,
+                            start: recStart,
+                            end: recEnd
+                        });
+                    }
+                }
             });
+            
             calendarInstance.removeAllEvents();
             calendarInstance.addEventSource(events);
         }
@@ -1585,6 +1650,9 @@
             document.getElementById('meeting-end').value = '';
             document.getElementById('meeting-allday').checked = false;
             document.getElementById('meeting-time-container').classList.remove('hidden');
+            document.getElementById('meeting-repeat').value = 'none';
+            document.getElementById('meeting-repeat-until').value = '';
+            document.getElementById('meeting-repeat-until-container').classList.add('hidden');
             
             document.getElementById('btn-delete-meeting').classList.add('hidden');
             document.getElementById('meeting-modal-title').innerHTML = '<i data-lucide="calendar-plus" class="w-5 h-5 text-[#a855f7]"></i> New Meeting';
@@ -1599,6 +1667,11 @@
                 document.getElementById('meeting-start').value = existingMeeting.startTime || '';
                 document.getElementById('meeting-end').value = existingMeeting.endTime || '';
                 document.getElementById('meeting-allday').checked = !!existingMeeting.allDay;
+                document.getElementById('meeting-repeat').value = existingMeeting.recurrence || 'none';
+                document.getElementById('meeting-repeat-until').value = existingMeeting.recurrenceUntil || '';
+                if (existingMeeting.recurrence && existingMeeting.recurrence !== 'none') {
+                    document.getElementById('meeting-repeat-until-container').classList.remove('hidden');
+                }
                 if (existingMeeting.allDay) {
                     document.getElementById('meeting-time-container').classList.add('hidden');
                 }
@@ -1655,6 +1728,8 @@
             const allDay = document.getElementById('meeting-allday').checked;
             const startTime = allDay ? '' : document.getElementById('meeting-start').value;
             const endTime = allDay ? '' : document.getElementById('meeting-end').value;
+            const recurrence = document.getElementById('meeting-repeat').value;
+            const recurrenceUntil = document.getElementById('meeting-repeat-until').value;
 
             if (!title.trim()) {
                 alert('Please enter a meeting title');
@@ -1673,10 +1748,12 @@
                     meeting.allDay = allDay;
                     meeting.startTime = startTime;
                     meeting.endTime = endTime;
+                    meeting.recurrence = recurrence;
+                    meeting.recurrenceUntil = recurrenceUntil;
                 }
             } else {
                 // Create new
-                window.addTask(title, source, 'medium', date, 'meeting', startTime, endTime, notes, endDate, allDay);
+                window.addTask(title, source, 'medium', date, 'meeting', startTime, endTime, notes, endDate, allDay, recurrence, recurrenceUntil);
             }
 
             window.renderTasks();
