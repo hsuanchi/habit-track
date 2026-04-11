@@ -956,21 +956,33 @@
 
             completedItems.forEach(item => {
                 let hours = 0;
-                if (item.difficulty === 'easy') hours = 1;
-                else if (item.difficulty === 'medium') hours = 3;
-                else if (item.difficulty === 'hard') hours = 5;
-                else hours = 3; // fallback
+                
+                if (item.type === 'meeting' && item.startTime && item.endTime && !item.allDay) {
+                    const startStr = `${item.date}T${item.startTime}`;
+                    const endStr = `${item.endDate || item.date}T${item.endTime}`;
+                    const start = new Date(startStr);
+                    const end = new Date(endStr);
+                    let diff = (end - start) / (1000 * 60 * 60);
+                    if (diff < 0 && !item.endDate) diff += 24; // Handle overnight meetings on the same date
+                    hours = Math.max(0, Math.round(diff * 10) / 10);
+                } else {
+                    if (item.difficulty === 'easy') hours = 1;
+                    else if (item.difficulty === 'medium') hours = 3;
+                    else if (item.difficulty === 'hard') hours = 5;
+                    else hours = 3; // fallback
+                }
 
                 if (item.type === 'task') tasksCount++;
                 if (item.type === 'meeting') meetingsCount++;
 
-                totalHours += hours;
+                // Round totalHours to 1 decimal place to avoid floating point issues
+                totalHours = Math.round((totalHours + hours) * 10) / 10;
 
                 const source = item.source || 'Uncategorized';
                 if (!sourceStats[source]) {
                     sourceStats[source] = { hours: 0, count: 0, items: [] };
                 }
-                sourceStats[source].hours += hours;
+                sourceStats[source].hours = Math.round((sourceStats[source].hours + hours) * 10) / 10;
                 sourceStats[source].count += 1;
                 sourceStats[source].items.push({ ...item, calculatedHours: hours });
             });
