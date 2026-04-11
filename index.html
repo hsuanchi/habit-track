@@ -13,6 +13,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <!-- Date Fns -->
     <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
     <!-- FullCalendar -->
@@ -179,6 +180,7 @@
                 <div class="flex items-center gap-1 sm:gap-2 bg-slate-900/50 p-1 rounded-lg border border-slate-800 shrink-0 order-3 sm:order-none w-full sm:w-auto justify-center mt-2 sm:mt-0">
                     <button id="nav-habits" onclick="switchTab('habits')" class="px-4 sm:px-4 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white transition-all flex-1 sm:flex-none">Habits</button>
                     <button id="nav-tasks" onclick="switchTab('tasks')" class="px-4 sm:px-4 py-1.5 rounded-md text-sm font-bold bg-[#ff6b35] text-white shadow-sm transition-all flex-1 sm:flex-none">TaskFlow</button>
+                    <button id="nav-review" onclick="switchTab('review')" class="px-4 sm:px-4 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white transition-all flex-1 sm:flex-none">Review</button>
                 </div>
 
                 <!-- Spacer -->
@@ -443,6 +445,61 @@
                 </div>
             </div>
 
+            <!-- Review View -->
+            <div id="view-review" class="w-full flex-1 flex-col gap-6" style="display: none;">
+                <!-- Filters -->
+                <div class="flex items-center justify-between bg-slate-900/50 p-2 rounded-xl border border-slate-800">
+                    <div class="flex gap-2">
+                        <button onclick="setReviewFilter('week')" id="filter-week" class="px-4 py-1.5 rounded-lg text-sm font-bold bg-slate-800 text-white transition-colors">This Week</button>
+                        <button onclick="setReviewFilter('month')" id="filter-month" class="px-4 py-1.5 rounded-lg text-sm font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">This Month</button>
+                    </div>
+                </div>
+
+                <!-- 4 Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="clean-card rounded-2xl p-5 flex flex-col justify-center">
+                        <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Tasks Completed</div>
+                        <div class="text-3xl font-black text-white" id="review-tasks-count">0</div>
+                    </div>
+                    <div class="clean-card rounded-2xl p-5 flex flex-col justify-center">
+                        <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Meetings Attended</div>
+                        <div class="text-3xl font-black text-white" id="review-meetings-count">0</div>
+                    </div>
+                    <div class="clean-card rounded-2xl p-5 flex flex-col justify-center">
+                        <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Total Hours Spent</div>
+                        <div class="text-3xl font-black text-[#ff6b35]" id="review-total-hours">0h</div>
+                    </div>
+                    <div class="clean-card rounded-2xl p-5 flex flex-col justify-center">
+                        <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Top Source (Hours)</div>
+                        <div class="text-xl font-bold text-[#ff6b35] truncate" id="review-top-source">-</div>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="clean-card rounded-2xl p-6">
+                        <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">Source Distribution (Hours)</h3>
+                        <div class="h-[250px] relative w-full flex justify-center">
+                            <canvas id="review-doughnut-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="clean-card rounded-2xl p-6">
+                        <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">Tasks & Meetings by Source (Count)</h3>
+                        <div class="h-[250px] relative w-full">
+                            <canvas id="review-bar-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History List -->
+                <div class="clean-card rounded-2xl p-6 flex-1">
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">Achievements by Source</h3>
+                    <div id="review-history-list" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Grouped by source -->
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -607,27 +664,28 @@
             state.ui.currentTab = tab;
             const viewHabits = document.getElementById('view-habits');
             const viewTasks = document.getElementById('view-tasks');
+            const viewReview = document.getElementById('view-review');
             
-            if (tab === 'habits') {
-                viewHabits.style.display = 'grid';
-                viewTasks.style.display = 'none';
-            } else {
-                viewHabits.style.display = 'none';
-                viewTasks.style.display = 'grid';
-            }
+            viewHabits.style.display = tab === 'habits' ? 'grid' : 'none';
+            viewTasks.style.display = tab === 'tasks' ? 'grid' : 'none';
+            viewReview.style.display = tab === 'review' ? 'flex' : 'none';
             
             const navHabits = document.getElementById('nav-habits');
             const navTasks = document.getElementById('nav-tasks');
+            const navReview = document.getElementById('nav-review');
             
-            if (tab === 'habits') {
-                navHabits.className = "px-4 py-1.5 rounded-md text-sm font-bold bg-[#ff6b35] text-white shadow-sm transition-all";
-                navTasks.className = "px-4 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white transition-all";
-            } else {
-                navTasks.className = "px-4 py-1.5 rounded-md text-sm font-bold bg-[#ff6b35] text-white shadow-sm transition-all";
-                navHabits.className = "px-4 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white transition-all";
-                if (calendarInstance) {
-                    setTimeout(() => calendarInstance.render(), 100);
-                }
+            const activeClass = "px-4 sm:px-4 py-1.5 rounded-md text-sm font-bold bg-[#ff6b35] text-white shadow-sm transition-all flex-1 sm:flex-none";
+            const inactiveClass = "px-4 sm:px-4 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white transition-all flex-1 sm:flex-none";
+
+            navHabits.className = tab === 'habits' ? activeClass : inactiveClass;
+            navTasks.className = tab === 'tasks' ? activeClass : inactiveClass;
+            navReview.className = tab === 'review' ? activeClass : inactiveClass;
+
+            if (tab === 'tasks' && calendarInstance) {
+                setTimeout(() => calendarInstance.render(), 100);
+            }
+            if (tab === 'review') {
+                renderReview();
             }
         };
 
@@ -821,8 +879,277 @@
             if (calendarInstance && state.ui.activeTab === 'tasks') {
                 setTimeout(() => calendarInstance.render(), 100);
             }
+            if (state.ui.currentTab === 'review') {
+                renderReview();
+            }
         }
         
+        let reviewFilter = 'week';
+        window.setReviewFilter = (filter) => {
+            reviewFilter = filter;
+            document.getElementById('filter-week').className = filter === 'week' ? 'px-4 py-1.5 rounded-lg text-sm font-bold bg-slate-800 text-white transition-colors' : 'px-4 py-1.5 rounded-lg text-sm font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-colors';
+            document.getElementById('filter-month').className = filter === 'month' ? 'px-4 py-1.5 rounded-lg text-sm font-bold bg-slate-800 text-white transition-colors' : 'px-4 py-1.5 rounded-lg text-sm font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-colors';
+            renderReview();
+        };
+
+        let reviewDoughnutChart = null;
+        let reviewBarChart = null;
+
+        function generateGradientColors(count) {
+            const colors = [];
+            for (let i = 0; i < count; i++) {
+                const ratio = count <= 1 ? 0 : i / (count - 1);
+                // Interpolate from Primary Orange (#ff6b35) to Amber/Yellow (#fcd34d)
+                const r = Math.round(255 + ratio * (252 - 255));
+                const g = Math.round(107 + ratio * (211 - 107));
+                const b = Math.round(53 + ratio * (77 - 53));
+                colors.push(`rgb(${r}, ${g}, ${b})`);
+            }
+            return colors;
+        }
+
+        function renderReview() {
+            if (!window.dateFns) return;
+            const now = new Date();
+            let startDate = new Date(0);
+            if (reviewFilter === 'week') {
+                startDate = dateFns.startOfWeek(now, { weekStartsOn: 1 });
+            } else if (reviewFilter === 'month') {
+                startDate = dateFns.startOfMonth(now);
+            }
+
+            // Filter completed tasks and past meetings
+            const completedItems = state.tasks.filter(t => {
+                if (!t.date) return false;
+                const itemDate = new Date(t.date);
+                if (itemDate < startDate) return false;
+                if (itemDate > now) return false; // Only past/completed
+
+                if (t.type === 'meeting') {
+                    // Consider meeting attended if its end time (or date) has passed
+                    let endDateTime = itemDate;
+                    if (t.endTime) {
+                        endDateTime = new Date(`${t.date}T${t.endTime}`);
+                    } else {
+                        endDateTime.setHours(23, 59, 59);
+                    }
+                    return endDateTime <= now;
+                } else {
+                    return t.completed === true;
+                }
+            });
+
+            let tasksCount = 0;
+            let meetingsCount = 0;
+            let totalHours = 0;
+            const sourceStats = {}; // { sourceName: { hours: 0, count: 0, items: [] } }
+
+            completedItems.forEach(item => {
+                let hours = 0;
+                if (item.difficulty === 'easy') hours = 1;
+                else if (item.difficulty === 'medium') hours = 3;
+                else if (item.difficulty === 'hard') hours = 5;
+                else hours = 3; // fallback
+
+                if (item.type === 'task') tasksCount++;
+                if (item.type === 'meeting') meetingsCount++;
+
+                totalHours += hours;
+
+                const source = item.source || 'Uncategorized';
+                if (!sourceStats[source]) {
+                    sourceStats[source] = { hours: 0, count: 0, items: [] };
+                }
+                sourceStats[source].hours += hours;
+                sourceStats[source].count += 1;
+                sourceStats[source].items.push({ ...item, calculatedHours: hours });
+            });
+
+            // Update Cards
+            document.getElementById('review-tasks-count').innerText = tasksCount;
+            document.getElementById('review-meetings-count').innerText = meetingsCount;
+            document.getElementById('review-total-hours').innerText = totalHours + 'h';
+
+            let topSource = '-';
+            let maxHours = -1;
+            for (const [src, stats] of Object.entries(sourceStats)) {
+                if (stats.hours > maxHours && src !== 'Uncategorized') {
+                    maxHours = stats.hours;
+                    topSource = src;
+                }
+            }
+            if (topSource === '-' && sourceStats['Uncategorized']) topSource = 'Uncategorized';
+            document.getElementById('review-top-source').innerText = topSource;
+
+            // Prepare Chart Data
+            const allSources = Object.keys(sourceStats);
+            
+            // Sort by hours for Doughnut
+            const doughnutLabels = [...allSources].sort((a, b) => sourceStats[b].hours - sourceStats[a].hours);
+            const hoursData = doughnutLabels.map(l => sourceStats[l].hours);
+            const doughnutColors = generateGradientColors(doughnutLabels.length);
+
+            // Sort by count for Bar chart
+            const barLabels = [...allSources].sort((a, b) => sourceStats[b].count - sourceStats[a].count);
+            const countData = barLabels.map(l => sourceStats[l].count);
+            const barColors = generateGradientColors(barLabels.length);
+
+            // Doughnut Chart (Hours)
+            const ctxDoughnut = document.getElementById('review-doughnut-chart');
+            if (ctxDoughnut) {
+                if (reviewDoughnutChart) reviewDoughnutChart.destroy();
+                
+                const doughnutPlugins = [];
+                if (window.ChartDataLabels) {
+                    Chart.register(ChartDataLabels);
+                }
+
+                reviewDoughnutChart = new Chart(ctxDoughnut, {
+                    type: 'doughnut',
+                    data: {
+                        labels: doughnutLabels,
+                        datasets: [{
+                            data: hoursData,
+                            backgroundColor: doughnutColors,
+                            borderWidth: 0,
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return ` ${context.label}: ${context.raw}h`;
+                                    }
+                                }
+                            },
+                            datalabels: {
+                                color: '#ffffff',
+                                font: {
+                                    weight: 'bold',
+                                    size: 11,
+                                    family: 'Inter'
+                                },
+                                formatter: (value, ctx) => {
+                                    return ctx.chart.data.labels[ctx.dataIndex];
+                                },
+                                display: function(context) {
+                                    return context.dataset.data[context.dataIndex] > 0; // Only show if > 0
+                                }
+                            }
+                        },
+                        cutout: '65%'
+                    }
+                });
+            }
+
+            // Bar Chart (Count)
+            const ctxBar = document.getElementById('review-bar-chart');
+            if (ctxBar) {
+                if (reviewBarChart) reviewBarChart.destroy();
+                reviewBarChart = new Chart(ctxBar, {
+                    type: 'bar',
+                    data: {
+                        labels: barLabels,
+                        datasets: [{
+                            label: 'Items Completed',
+                            data: countData,
+                            backgroundColor: barColors,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return ` ${context.raw} items`;
+                                    }
+                                }
+                            },
+                            datalabels: {
+                                display: false // Hide datalabels on bar chart
+                            }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8', stepSize: 1 } },
+                            x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                        }
+                    }
+                });
+            }
+
+            // Render History List
+            const historyContainer = document.getElementById('review-history-list');
+            if (!historyContainer) return;
+            historyContainer.innerHTML = '';
+
+            if (allSources.length === 0) {
+                historyContainer.innerHTML = '<div class="text-slate-500 text-sm text-center py-8 col-span-full">No achievements found in this period.</div>';
+                return;
+            }
+
+            // Sort sources by hours descending for the list
+            const sortedSources = doughnutLabels;
+
+            sortedSources.forEach(src => {
+                const stats = sourceStats[src];
+                // Sort items by date descending
+                stats.items.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                let html = `
+                    <div class="clean-card p-4 rounded-xl border border-slate-800 bg-slate-800/20 h-fit">
+                        <div class="flex items-center justify-between mb-3 border-b border-slate-700 pb-2">
+                            <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                                <i data-lucide="folder" class="w-4 h-4 text-[#ff6b35]"></i> ${src}
+                            </h4>
+                            <span class="text-xs font-bold text-slate-400 bg-slate-800 px-2 py-1 rounded">${stats.hours}h total</span>
+                        </div>
+                        <div class="space-y-2 pl-1">
+                `;
+
+                stats.items.forEach(item => {
+                    const icon = item.type === 'meeting' ? 'calendar' : 'check-circle-2';
+                    const iconColor = item.type === 'meeting' ? 'text-[#ff6b35]' : 'text-[#ff6b35]';
+                    const diffColors = {
+                        easy: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
+                        medium: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
+                        hard: 'text-rose-400 bg-rose-400/10 border-rose-400/20'
+                    };
+                    const diffClass = diffColors[item.difficulty] || diffColors.medium;
+                    const dateStr = window.dateFns ? dateFns.format(new Date(item.date), 'MMM d') : item.date;
+
+                    html += `
+                        <div class="flex items-center justify-between p-2 hover:bg-slate-800/50 rounded-lg transition-colors border border-transparent hover:border-slate-700">
+                            <div class="flex items-center gap-3 overflow-hidden">
+                                <i data-lucide="${icon}" class="w-4 h-4 ${iconColor} shrink-0"></i>
+                                <div class="flex flex-col truncate">
+                                    <span class="text-sm font-medium text-slate-200 truncate">${item.title}</span>
+                                    <span class="text-xs text-slate-500">${dateStr}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0 ml-2">
+                                <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${diffClass}">${item.difficulty || 'medium'}</span>
+                                <span class="text-xs font-bold text-slate-400 w-6 text-right">${item.calculatedHours}h</span>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `</div></div>`;
+                historyContainer.innerHTML += html;
+            });
+
+            if (window.lucide) window.lucide.createIcons({ root: historyContainer });
+        }
+
         function updateCalendarEvents() {
             if (!calendarInstance) return;
             const events = [];
@@ -1903,10 +2230,60 @@
         });
 
         let unsubscribeUser = null;
+
+        function generateMockData() {
+            if (!window.dateFns) return;
+            const today = new Date();
+            const habits = [
+                { id: crypto.randomUUID(), title: 'Read 30 mins', type: 'good', completedDates: [] },
+                { id: crypto.randomUUID(), title: 'Workout', type: 'good', completedDates: [] },
+                { id: crypto.randomUUID(), title: 'Junk Food', type: 'bad', completedDates: [] }
+            ];
+            const tasks = [];
+            const sources = ['Project Alpha', 'Learning', 'Admin', 'Health', 'Design'];
+
+            for (let i = 0; i < 30; i++) {
+                const d = dateFns.subDays(today, i);
+                const dateStr = dateFns.format(d, 'yyyy-MM-dd');
+
+                if (Math.random() > 0.3) habits[0].completedDates.push(dateStr);
+                if (Math.random() > 0.5) habits[1].completedDates.push(dateStr);
+                if (Math.random() > 0.8) habits[2].completedDates.push(dateStr);
+
+                const numTasks = Math.floor(Math.random() * 4);
+                for (let j = 0; j < numTasks; j++) {
+                    const isMeeting = Math.random() > 0.8;
+                    const diffs = ['easy', 'medium', 'hard'];
+                    tasks.push({
+                        id: crypto.randomUUID(),
+                        title: isMeeting ? `Sync with team ${j}` : `Complete task ${j}`,
+                        type: isMeeting ? 'meeting' : 'task',
+                        source: sources[Math.floor(Math.random() * sources.length)],
+                        difficulty: diffs[Math.floor(Math.random() * diffs.length)],
+                        date: dateStr,
+                        completed: true,
+                        createdAt: new Date(d).toISOString(),
+                        order: j
+                    });
+                }
+            }
+            state.habits = habits;
+            state.tasks = tasks;
+            state.stats.currentXp = 450;
+            state.stats.level = 5;
+            saveData();
+        }
+
         async function loadUserData(uid) {
             let localData = null;
             try { localData = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)); } catch (e) {}
             
+            if (isOfflineMode && !localData) {
+                generateMockData();
+                renderAll();
+                return;
+            }
+
             if (!isOfflineMode && db) {
                 return new Promise((resolve) => {
                     let isFirstLoad = true;
