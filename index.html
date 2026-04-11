@@ -475,18 +475,28 @@
                     </div>
                 </div>
 
-                <!-- Charts -->
+                <!-- Charts & Table -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div class="clean-card rounded-2xl p-6">
                         <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">Source Distribution (Hours)</h3>
-                        <div class="h-[250px] relative w-full flex justify-center">
+                        <div class="h-[300px] relative w-full flex justify-center">
                             <canvas id="review-doughnut-chart"></canvas>
                         </div>
                     </div>
-                    <div class="clean-card rounded-2xl p-6">
-                        <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">Tasks & Meetings by Source (Count)</h3>
-                        <div class="h-[250px] relative w-full">
-                            <canvas id="review-bar-chart"></canvas>
+                    <div class="clean-card rounded-2xl p-6 flex flex-col">
+                        <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">Source Details</h3>
+                        <div class="overflow-y-auto custom-scrollbar flex-1 pr-2" style="max-height: 300px;">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider sticky top-0 bg-slate-900/95 backdrop-blur-sm z-10">
+                                        <th class="pb-3 font-bold">Source</th>
+                                        <th class="pb-3 font-bold text-right">Hours</th>
+                                        <th class="pb-3 font-bold text-right">Count</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="review-source-table-body" class="text-sm text-slate-200">
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -984,106 +994,159 @@
             // Prepare Chart Data
             const allSources = Object.keys(sourceStats);
             
-            // Sort by hours for Doughnut
-            const doughnutLabels = [...allSources].sort((a, b) => sourceStats[b].hours - sourceStats[a].hours);
-            const hoursData = doughnutLabels.map(l => sourceStats[l].hours);
+            // Sort by hours descending
+            const sortedSources = [...allSources].sort((a, b) => sourceStats[b].hours - sourceStats[a].hours);
+            
+            // Group into Top 5 + Other for Doughnut
+            const MAX_SLICES = 5;
+            let doughnutLabels = [];
+            let hoursData = [];
+            let countsData = [];
+            
+            if (sortedSources.length > MAX_SLICES + 1) {
+                const topSources = sortedSources.slice(0, MAX_SLICES);
+                const otherSources = sortedSources.slice(MAX_SLICES);
+                
+                doughnutLabels = [...topSources, 'Other'];
+                hoursData = topSources.map(src => sourceStats[src].hours);
+                countsData = topSources.map(src => sourceStats[src].count);
+                
+                const otherHours = otherSources.reduce((sum, src) => sum + sourceStats[src].hours, 0);
+                const otherCount = otherSources.reduce((sum, src) => sum + sourceStats[src].count, 0);
+                
+                hoursData.push(otherHours);
+                countsData.push(otherCount);
+            } else {
+                doughnutLabels = [...sortedSources];
+                hoursData = sortedSources.map(src => sourceStats[src].hours);
+                countsData = sortedSources.map(src => sourceStats[src].count);
+            }
+
             const doughnutColors = generateGradientColors(doughnutLabels.length);
 
-            // Sort by count for Bar chart
-            const barLabels = [...allSources].sort((a, b) => sourceStats[b].count - sourceStats[a].count);
-            const countData = barLabels.map(l => sourceStats[l].count);
-            const barColors = generateGradientColors(barLabels.length);
+            // Custom Plugin for Dashed Lines and Labels
+            const dashedLinePlugin = {
+                id: 'dashedLineLabels',
+                afterDraw: (chart) => {
+                    const ctx = chart.ctx;
+                    const meta = chart.getDatasetMeta(0);
+                    const data = chart.data.datasets[0].data;
+                    const counts = chart.data.datasets[0].counts;
+                    const labels = chart.data.labels;
+
+                    ctx.save();
+                    meta.data.forEach((element, index) => {
+                        if (data[index] === 0) return;
+
+                        const xCenter = element.x;
+                        const yCenter = element.y;
+                        const outerRadius = element.outerRadius;
+                        const angle = (element.startAngle + element.endAngle) / 2;
+                        
+                        const cos = Math.cos(angle);
+                        const sin = Math.sin(angle);
+
+                        const x0 = xCenter + cos * outerRadius;
+                        const y0 = yCenter + sin * outerRadius;
+                        
+                        const x1 = xCenter + cos * (outerRadius + 15);
+                        const y1 = yCenter + sin * (outerRadius + 15);
+                        
+                        const x2 = x1 + (cos >= 0 ? 1 : -1) * 15;
+                        const y2 = y1;
+
+                        // Draw dashed line
+                        ctx.beginPath();
+                        ctx.setLineDash([3, 3]);
+                        ctx.moveTo(x0, y0);
+                        ctx.lineTo(x1, y1);
+                        ctx.lineTo(x2, y2);
+                        ctx.strokeStyle = '#64748b'; // slate-500
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+
+                        // Draw text
+                        ctx.fillStyle = '#f8fafc'; // slate-50
+                        ctx.font = '11px Inter, sans-serif';
+                        ctx.textBaseline = 'middle';
+                        ctx.textAlign = cos >= 0 ? 'left' : 'right';
+                        
+                        const textX = x2 + (cos >= 0 ? 6 : -6);
+                        const text = `${labels[index]} (${data[index]}h, ${counts[index]}x)`;
+                        ctx.fillText(text, textX, y2);
+                    });
+                    ctx.restore();
+                }
+            };
 
             // Doughnut Chart (Hours)
             const ctxDoughnut = document.getElementById('review-doughnut-chart');
             if (ctxDoughnut) {
                 if (reviewDoughnutChart) reviewDoughnutChart.destroy();
                 
-                const doughnutPlugins = [];
-                if (window.ChartDataLabels) {
-                    Chart.register(ChartDataLabels);
-                }
-
                 reviewDoughnutChart = new Chart(ctxDoughnut, {
                     type: 'doughnut',
                     data: {
                         labels: doughnutLabels,
                         datasets: [{
                             data: hoursData,
+                            counts: countsData,
                             backgroundColor: doughnutColors,
                             borderWidth: 0,
                             hoverOffset: 4
                         }]
                     },
+                    plugins: [dashedLinePlugin],
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        layout: {
+                            padding: 60
+                        },
                         plugins: {
                             legend: { display: false },
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
-                                        return ` ${context.label}: ${context.raw}h`;
+                                        const count = context.dataset.counts[context.dataIndex];
+                                        return ` ${context.label}: ${context.raw}h (${count} items)`;
                                     }
                                 }
                             },
                             datalabels: {
-                                color: '#ffffff',
-                                font: {
-                                    weight: 'bold',
-                                    size: 11,
-                                    family: 'Inter'
-                                },
-                                formatter: (value, ctx) => {
-                                    return ctx.chart.data.labels[ctx.dataIndex];
-                                },
-                                display: function(context) {
-                                    return context.dataset.data[context.dataIndex] > 0; // Only show if > 0
-                                }
+                                display: false
                             }
                         },
-                        cutout: '65%'
+                        cutout: '60%'
                     }
                 });
             }
 
-            // Bar Chart (Count)
-            const ctxBar = document.getElementById('review-bar-chart');
-            if (ctxBar) {
-                if (reviewBarChart) reviewBarChart.destroy();
-                reviewBarChart = new Chart(ctxBar, {
-                    type: 'bar',
-                    data: {
-                        labels: barLabels,
-                        datasets: [{
-                            label: 'Items Completed',
-                            data: countData,
-                            backgroundColor: barColors,
-                            borderRadius: 4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        return ` ${context.raw} items`;
-                                    }
-                                }
-                            },
-                            datalabels: {
-                                display: false // Hide datalabels on bar chart
-                            }
-                        },
-                        scales: {
-                            y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8', stepSize: 1 } },
-                            x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
-                        }
-                    }
-                });
+            // Render Table
+            const tableBody = document.getElementById('review-source-table-body');
+            if (tableBody) {
+                tableBody.innerHTML = '';
+                if (sortedSources.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-slate-500">No data available</td></tr>';
+                } else {
+                    sortedSources.forEach((src, index) => {
+                        const stats = sourceStats[src];
+                        // Get color from gradient based on index, fallback to last color if out of bounds
+                        const colorIndex = Math.min(index, doughnutColors.length - 1);
+                        const color = doughnutColors[colorIndex] || '#ff6b35';
+                        tableBody.innerHTML += `
+                            <tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                                <td class="py-3 font-medium text-slate-200 flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full" style="background-color: ${color}"></span>
+                                    ${src}
+                                </td>
+                                <td class="py-3 text-right font-bold text-slate-300">${stats.hours}h</td>
+                                <td class="py-3 text-right text-slate-400">${stats.count}</td>
+                            </tr>
+                        `;
+                    });
+                }
             }
 
             // Render History List
@@ -1096,9 +1159,7 @@
                 return;
             }
 
-            // Sort sources by hours descending for the list
-            const sortedSources = doughnutLabels;
-
+            // Use the already sorted 'sortedSources' array for the history list
             sortedSources.forEach(src => {
                 const stats = sourceStats[src];
                 // Sort items by date descending
