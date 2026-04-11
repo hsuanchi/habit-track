@@ -371,6 +371,14 @@
                             </h3>
                         </div>
                         
+                        <!-- Search Tasks -->
+                        <div class="mb-4 relative">
+                            <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-2 flex items-center gap-2 focus-within:border-[#ff6b35]/50 transition-colors">
+                                <i data-lucide="search" class="w-4 h-4 text-slate-500 ml-2"></i>
+                                <input type="text" id="task-search-input" oninput="window.renderTasks()" placeholder="Search tasks..." class="bg-transparent w-full text-sm text-white placeholder-slate-600 px-2 outline-none">
+                            </div>
+                        </div>
+
                         <!-- Inline Add Task -->
                         <div class="mb-4 relative" id="new-task-container">
                             <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-2 flex flex-col gap-2 focus-within:border-[#ff6b35]/50 transition-colors">
@@ -780,6 +788,23 @@
             const task = state.tasks.find(t => t.id === id);
             if (task) {
                 task.completed = !task.completed;
+                
+                if (task.completed) {
+                    // Add XP based on difficulty
+                    let xpReward = 10; // default easy
+                    if (task.difficulty === 'medium') xpReward = 20;
+                    else if (task.difficulty === 'hard') xpReward = 30;
+                    
+                    updateStats(xpReward, 'MIND', 0);
+                } else {
+                    // Remove XP if uncompleted
+                    let xpReward = 10;
+                    if (task.difficulty === 'medium') xpReward = 20;
+                    else if (task.difficulty === 'hard') xpReward = 30;
+                    
+                    updateStats(-xpReward, 'MIND', 0);
+                }
+
                 renderTasks();
                 updateCalendarEvents();
                 saveData();
@@ -1544,7 +1569,12 @@
                 const isMeeting = task.type === 'meeting';
                 
                 const diffMap = { easy: 'E', medium: 'M', hard: 'H' };
-                const diffColor = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+                let diffColor = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'; // default easy
+                if (task.difficulty === 'medium') {
+                    diffColor = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+                } else if (task.difficulty === 'hard') {
+                    diffColor = 'bg-[#ff6b35]/10 text-[#ff6b35] border-[#ff6b35]/20';
+                }
 
                 let html = `
                 <div id="task-el-${task.id}" data-id="${task.id}" class="task-item bg-slate-900/50 border ${isExpanded ? 'border-[#ff6b35]' : 'border-slate-800'} rounded-xl p-3 transition-colors">
@@ -1639,7 +1669,18 @@
             };
 
             // Sort tasks: incomplete first, then by order property, then by createdAt descending
-            const sortedTasks = [...state.tasks].filter(t => t.type !== 'meeting').sort((a, b) => {
+            const searchQuery = (document.getElementById('task-search-input')?.value || '').toLowerCase();
+            
+            const sortedTasks = [...state.tasks].filter(t => {
+                if (t.type === 'meeting') return false;
+                if (searchQuery) {
+                    const titleMatch = (t.title || '').toLowerCase().includes(searchQuery);
+                    const sourceMatch = (t.source || '').toLowerCase().includes(searchQuery);
+                    const notesMatch = (t.notes || '').toLowerCase().includes(searchQuery);
+                    return titleMatch || sourceMatch || notesMatch;
+                }
+                return true;
+            }).sort((a, b) => {
                 if (a.completed !== b.completed) return a.completed ? 1 : -1;
                 if ((a.order || 0) !== (b.order || 0)) return (a.order || 0) - (b.order || 0);
                 return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
