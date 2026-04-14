@@ -439,6 +439,17 @@
                             <!-- Tasks will be rendered here -->
                         </div>
 
+                        <!-- Waiting Tasks (Collapsible) -->
+                        <div class="mt-4 pt-4 border-t border-slate-800">
+                            <button onclick="toggleWaitingTasks()" class="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-300 uppercase tracking-wider w-full transition-colors">
+                                <i data-lucide="chevron-down" id="waiting-tasks-icon" class="w-4 h-4 transition-transform"></i>
+                                Waiting List (<span id="waiting-tasks-count">0</span>)
+                            </button>
+                            <div id="waiting-tasks-list" class="hidden mt-3 space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
+                                <!-- Waiting tasks will be rendered here -->
+                            </div>
+                        </div>
+
                         <!-- Completed Tasks (Collapsible) -->
                         <div class="mt-4 pt-4 border-t border-slate-800">
                             <button onclick="toggleCompletedTasks()" class="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-300 uppercase tracking-wider w-full transition-colors">
@@ -681,6 +692,7 @@
                 selectedStat: 'BODY',
                 currentTab: 'tasks',
                 expandedTaskId: null,
+                showWaitingTasks: false,
                 showCompletedTasks: false
             }
         };
@@ -837,6 +849,19 @@
                 renderTasks();
                 updateCalendarEvents();
                 saveData();
+            }
+        };
+
+        window.toggleWaitingTasks = () => {
+            state.ui.showWaitingTasks = !state.ui.showWaitingTasks;
+            const list = document.getElementById('waiting-tasks-list');
+            const icon = document.getElementById('waiting-tasks-icon');
+            if (state.ui.showWaitingTasks) {
+                list.classList.remove('hidden');
+                icon.classList.add('rotate-180');
+            } else {
+                list.classList.add('hidden');
+                icon.classList.remove('rotate-180');
             }
         };
 
@@ -1553,14 +1578,18 @@
 
         function renderTasks() {
             const activeList = document.getElementById('active-tasks-list');
+            const waitingList = document.getElementById('waiting-tasks-list');
             const completedList = document.getElementById('completed-tasks-list');
+            const waitingCount = document.getElementById('waiting-tasks-count');
             const completedCount = document.getElementById('completed-tasks-count');
             
-            if (!activeList || !completedList) return;
+            if (!activeList || !waitingList || !completedList) return;
 
             activeList.innerHTML = '';
+            waitingList.innerHTML = '';
             completedList.innerHTML = '';
             
+            let waitingTasksCount = 0;
             let completedTasksCount = 0;
 
             const createTaskHTML = (task) => {
@@ -1656,6 +1685,9 @@
                             <button onclick="window.deleteTask('${task.id}')" class="text-xs font-bold text-rose-500 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
                                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
                             </button>
+                            <button onclick="window.updateTask('${task.id}', 'isWaiting', ${!task.isWaiting})" class="text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                                <i data-lucide="clock" class="w-3.5 h-3.5"></i> ${task.isWaiting ? 'Move to Active' : 'Wait'}
+                            </button>
                             <button onclick="window.expandTask(null)" class="text-xs font-bold text-white bg-[#ff6b35] hover:bg-[#ff8c61] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
                                 <i data-lucide="check" class="w-3.5 h-3.5"></i> Done
                             </button>
@@ -1690,6 +1722,9 @@
                 if (task.completed) {
                     completedList.innerHTML += createTaskHTML(task);
                     completedTasksCount++;
+                } else if (task.isWaiting) {
+                    waitingList.innerHTML += createTaskHTML(task);
+                    waitingTasksCount++;
                 } else {
                     activeList.innerHTML += createTaskHTML(task);
                 }
@@ -1698,23 +1733,46 @@
             if (activeList.innerHTML === '') {
                 activeList.innerHTML = `<div class="text-center py-8 border-2 border-dashed border-slate-800/50 rounded-xl text-slate-600"><p class="text-sm">No active tasks. You're all caught up!</p></div>`;
             }
+            if (waitingList.innerHTML === '') {
+                waitingList.innerHTML = `<div class="text-center py-4 border-2 border-dashed border-slate-800/50 rounded-xl text-slate-600"><p class="text-sm">No waiting tasks.</p></div>`;
+            }
             
+            if (waitingCount) waitingCount.innerText = waitingTasksCount;
             if (completedCount) completedCount.innerText = completedTasksCount;
             safeCreateIcons();
 
             // Initialize Sortable
             if (window.Sortable) {
+                const updateTaskOrderAndState = () => {
+                    Array.from(activeList.children).forEach((el, index) => {
+                        const task = state.tasks.find(t => t.id === el.dataset.id);
+                        if (task) { task.order = index; task.isWaiting = false; }
+                    });
+                    Array.from(waitingList.children).forEach((el, index) => {
+                        const task = state.tasks.find(t => t.id === el.dataset.id);
+                        if (task) { task.order = index; task.isWaiting = true; }
+                    });
+                    saveData();
+                };
+
                 new Sortable(activeList, {
+                    group: 'tasks',
                     animation: 150,
                     handle: '.drag-handle',
                     ghostClass: 'opacity-50',
-                    onEnd: function() {
-                        const newOrder = Array.from(activeList.children).map(el => el.dataset.id);
-                        newOrder.forEach((id, index) => {
-                            const task = state.tasks.find(t => t.id === id);
-                            if (task) task.order = index;
-                        });
-                        saveData();
+                    onEnd: function(evt) {
+                        updateTaskOrderAndState();
+                        if (evt.to !== evt.from) renderTasks(); // Re-render if moved between lists
+                    }
+                });
+                new Sortable(waitingList, {
+                    group: 'tasks',
+                    animation: 150,
+                    handle: '.drag-handle',
+                    ghostClass: 'opacity-50',
+                    onEnd: function(evt) {
+                        updateTaskOrderAndState();
+                        if (evt.to !== evt.from) renderTasks(); // Re-render if moved between lists
                     }
                 });
                 new Sortable(completedList, {
