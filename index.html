@@ -543,7 +543,7 @@
     </div>
 
     <!-- Task Edit Modal -->
-    <div id="task-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+    <div id="task-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300" onclick="if(event.target === this) saveTaskModal()">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300" id="task-modal-content">
             <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
                 <h3 class="text-lg font-bold text-white flex items-center gap-2">
@@ -587,6 +587,10 @@
                     <input type="checkbox" id="task-modal-completed" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-[#ff6b35] focus:ring-[#ff6b35] focus:ring-offset-slate-900">
                     <label for="task-modal-completed" class="text-sm font-bold text-slate-300 cursor-pointer">Completed</label>
                 </div>
+                <div class="flex items-center gap-2 mt-2">
+                    <input type="checkbox" id="task-modal-bookmarked" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-yellow-500 focus:ring-yellow-500 focus:ring-offset-slate-900">
+                    <label for="task-modal-bookmarked" class="text-sm font-bold text-slate-300 cursor-pointer">Bookmarked</label>
+                </div>
             </div>
             <div class="p-4 border-t border-slate-800 flex justify-between bg-slate-800/30">
                 <button onclick="deleteTaskModal()" class="px-4 py-2 rounded-lg text-sm font-bold text-rose-500 hover:bg-rose-500/10 transition-colors">Delete</button>
@@ -599,7 +603,7 @@
     </div>
 
     <!-- Meeting Modal -->
-    <div id="meeting-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+    <div id="meeting-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300" onclick="if(event.target === this) saveMeeting()">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300" id="meeting-modal-content">
             <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
                 <h3 class="text-lg font-bold text-white flex items-center gap-2" id="meeting-modal-title">
@@ -876,6 +880,16 @@
                     updateStats(-xpReward, 'MIND', 0);
                 }
 
+                renderTasks();
+                updateCalendarEvents();
+                saveData();
+            }
+        };
+
+        window.toggleBookmark = (id) => {
+            const task = state.tasks.find(t => t.id === id);
+            if (task) {
+                task.isBookmarked = !task.isBookmarked;
                 renderTasks();
                 updateCalendarEvents();
                 saveData();
@@ -1380,10 +1394,12 @@
                     const dateStr = window.dateFns ? dateFns.format(new Date(item.date), 'MMM d') : item.date;
                     const onClickHandler = item.type === 'meeting' ? `window.openMeetingModal(null, state.tasks.find(t => t.id === '${item.id}'))` : `window.openTaskModal('${item.id}')`;
 
+                    const bookmarkClass = item.isBookmarked ? 'bg-yellow-500/10 border-yellow-500/30 hover:border-yellow-500/50' : 'hover:bg-slate-800/50 border-transparent hover:border-slate-700';
+
                     html += `
-                        <div onclick="${onClickHandler}" class="flex items-center justify-between p-2 hover:bg-slate-800/50 rounded-lg transition-colors border border-transparent hover:border-slate-700 cursor-pointer">
+                        <div onclick="${onClickHandler}" class="flex items-center justify-between p-2 rounded-lg transition-colors border cursor-pointer ${bookmarkClass}">
                             <div class="flex items-center gap-3 overflow-hidden">
-                                <i data-lucide="${icon}" class="w-4 h-4 ${iconColor} shrink-0"></i>
+                                ${item.isBookmarked ? '<i data-lucide="bookmark" class="w-4 h-4 text-yellow-500 shrink-0 fill-yellow-500/20"></i>' : `<i data-lucide="${icon}" class="w-4 h-4 ${iconColor} shrink-0"></i>`}
                                 <div class="flex flex-col truncate">
                                     <span class="text-sm font-medium text-slate-200 truncate">${item.title}</span>
                                     <span class="text-xs text-slate-500">${dateStr}</span>
@@ -1427,21 +1443,32 @@
                     end = window.dateFns ? window.dateFns.format(endDate, 'yyyy-MM-dd') : t.endDate;
                 }
                 
+                let bgColor = t.completed ? '#334155' : (isMeeting ? 'transparent' : 'rgba(255, 107, 53, 0.2)');
+                let txtColor = t.completed ? '#94a3b8' : (isMeeting ? '#ffffff' : '#ff6b35');
+                let brdColor = t.completed ? 'transparent' : (isMeeting ? '#ffffff' : 'transparent');
+
+                if (t.isBookmarked) {
+                    bgColor = 'rgba(234, 179, 8, 0.2)'; // yellow-500/20
+                    txtColor = '#eab308'; // yellow-500
+                    brdColor = '#eab308';
+                }
+
                 const baseEvent = {
                     id: t.id,
                     title: t.title,
                     start: start,
                     end: end,
                     allDay: isAllDay,
-                    backgroundColor: t.completed ? '#334155' : (isMeeting ? 'transparent' : 'rgba(255, 107, 53, 0.2)'),
-                    textColor: t.completed ? '#94a3b8' : (isMeeting ? '#ffffff' : '#ff6b35'),
-                    borderColor: t.completed ? 'transparent' : (isMeeting ? '#ffffff' : 'transparent'),
+                    backgroundColor: bgColor,
+                    textColor: txtColor,
+                    borderColor: brdColor,
                     extendedProps: {
                         isMeeting: isMeeting,
                         completed: t.completed,
                         difficulty: t.difficulty,
                         startTime: t.startTime,
-                        endTime: t.endTime
+                        endTime: t.endTime,
+                        isBookmarked: t.isBookmarked
                     }
                 };
                 
@@ -1658,6 +1685,7 @@
                 const isExpanded = state.ui.expandedTaskId === task.id;
                 const isCompleted = task.completed;
                 const isMeeting = task.type === 'meeting';
+                const isBookmarked = task.isBookmarked;
                 
                 const diffMap = { quick: 'Q', easy: 'E', medium: 'M', hard: 'H' };
                 let diffColor = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'; // default easy
@@ -1669,8 +1697,13 @@
                     diffColor = 'bg-[#ff6b35]/10 text-[#ff6b35] border-[#ff6b35]/20';
                 }
 
+                let containerClass = `task-item bg-slate-900/50 border ${isExpanded ? 'border-[#ff6b35]' : 'border-slate-800'} rounded-xl p-3 transition-colors`;
+                if (isBookmarked) {
+                    containerClass = `task-item bg-yellow-500/10 border ${isExpanded ? 'border-yellow-400' : 'border-yellow-500/50'} rounded-xl p-3 transition-colors`;
+                }
+
                 let html = `
-                <div id="task-el-${task.id}" data-id="${task.id}" class="task-item bg-slate-900/50 border ${isExpanded ? 'border-[#ff6b35]' : 'border-slate-800'} rounded-xl p-3 transition-colors">
+                <div id="task-el-${task.id}" data-id="${task.id}" class="${containerClass}">
                     <div class="flex items-center gap-3 cursor-pointer" onclick="window.expandTask('${task.id}')">
                         <div class="drag-handle cursor-grab active:cursor-grabbing p-1 text-slate-600 hover:text-slate-400">
                             <i data-lucide="grip-vertical" class="w-4 h-4"></i>
@@ -1691,6 +1724,12 @@
                             <h4 class="text-sm font-medium ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-200'} truncate">${task.title}</h4>
                         </div>
 
+                        ${isBookmarked ? `
+                        <div class="flex-shrink-0 text-yellow-500">
+                            <i data-lucide="bookmark" class="w-4 h-4 fill-yellow-500/20"></i>
+                        </div>
+                        ` : ''}
+
                         <div class="flex items-center gap-2 flex-shrink-0">
                             ${!isMeeting ? `
                             <span class="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${diffColor}">
@@ -1703,59 +1742,62 @@
 
                 if (isExpanded) {
                     html += `
-                    <div class="mt-4 pt-4 border-t border-slate-800 space-y-3 fade-in">
+                    <div class="mt-4 pt-4 border-t border-slate-800 space-y-4 fade-in">
                         <div>
-                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Title</label>
-                            <input type="text" value="${task.title}" onblur="window.updateTask('${task.id}', 'title', this.value)" onchange="window.updateTask('${task.id}', 'title', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Notes</label>
-                            <textarea onblur="window.updateTask('${task.id}', 'notes', this.value)" onchange="window.updateTask('${task.id}', 'notes', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none resize-none custom-scrollbar" rows="2">${task.notes || ''}</textarea>
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Source</label>
-                                <input type="text" value="${task.source || ''}" onblur="window.updateTask('${task.id}', 'source', this.value)" onchange="window.updateTask('${task.id}', 'source', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
-                            </div>
-                            ${isMeeting ? `
-                            <div>
-                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Time</label>
-                                <div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-                                    <input type="time" value="${task.startTime || ''}" onblur="window.updateTask('${task.id}', 'startTime', this.value)" onchange="window.updateTask('${task.id}', 'startTime', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
-                                    <span class="text-slate-500 text-xs hidden sm:inline">to</span>
-                                    <input type="time" value="${task.endTime || ''}" onblur="window.updateTask('${task.id}', 'endTime', this.value)" onchange="window.updateTask('${task.id}', 'endTime', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none">
-                                </div>
-                            </div>
-                            ` : `
-                            <div>
-                                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Difficulty</label>
-                                <div class="flex gap-1">
-                                    <button type="button" onclick="window.updateTask('${task.id}', 'difficulty', 'quick')" class="flex-1 py-1.5 rounded-md text-xs font-bold border ${task.difficulty === 'quick' ? 'border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35]' : 'border-slate-700 text-slate-400 hover:text-white'} transition-colors">Quick</button>
-                                    <button type="button" onclick="window.updateTask('${task.id}', 'difficulty', 'easy')" class="flex-1 py-1.5 rounded-md text-xs font-bold border ${task.difficulty === 'easy' ? 'border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35]' : 'border-slate-700 text-slate-400 hover:text-white'} transition-colors">Easy</button>
-                                    <button type="button" onclick="window.updateTask('${task.id}', 'difficulty', 'medium')" class="flex-1 py-1.5 rounded-md text-xs font-bold border ${task.difficulty === 'medium' ? 'border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35]' : 'border-slate-700 text-slate-400 hover:text-white'} transition-colors">Medium</button>
-                                    <button type="button" onclick="window.updateTask('${task.id}', 'difficulty', 'hard')" class="flex-1 py-1.5 rounded-md text-xs font-bold border ${task.difficulty === 'hard' ? 'border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35]' : 'border-slate-700 text-slate-400 hover:text-white'} transition-colors">Hard</button>
-                                </div>
-                            </div>
-                            `}
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Title</label>
+                            <input type="text" value="${task.title}" onblur="window.updateTask('${task.id}', 'title', this.value)" onchange="window.updateTask('${task.id}', 'title', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors">
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Date</label>
-                            <div class="flex gap-2 items-center flex-wrap">
-                                <button type="button" onclick="window.updateTask('${task.id}', 'date', window.dateFns.format(new Date(), 'yyyy-MM-dd'))" class="px-2 py-1.5 rounded-md text-xs font-bold border border-slate-700 text-slate-400 hover:text-white transition-colors">Today</button>
-                                <button type="button" onclick="window.updateTask('${task.id}', 'date', window.dateFns.format(window.dateFns.addDays(new Date(), 1), 'yyyy-MM-dd'))" class="px-2 py-1.5 rounded-md text-xs font-bold border border-slate-700 text-slate-400 hover:text-white transition-colors">Tomorrow</button>
-                                <input type="date" value="${task.date}" onblur="window.updateTask('${task.id}', 'date', this.value)" onchange="window.updateTask('${task.id}', 'date', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-white focus:border-[#ff6b35] outline-none min-w-[120px]">
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Notes</label>
+                            <input type="text" value="${task.notes || ''}" onblur="window.updateTask('${task.id}', 'notes', this.value)" onchange="window.updateTask('${task.id}', 'notes', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors" placeholder="Add notes...">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Source</label>
+                            <input type="text" value="${task.source || ''}" onblur="window.updateTask('${task.id}', 'source', this.value)" onchange="window.updateTask('${task.id}', 'source', this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors">
+                        </div>
+                        ${isMeeting ? `
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Time</label>
+                            <div class="flex items-center gap-2">
+                                <input type="time" value="${task.startTime || ''}" onblur="window.updateTask('${task.id}', 'startTime', this.value)" onchange="window.updateTask('${task.id}', 'startTime', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors">
+                                <span class="text-slate-500 text-xs font-bold">to</span>
+                                <input type="time" value="${task.endTime || ''}" onblur="window.updateTask('${task.id}', 'endTime', this.value)" onchange="window.updateTask('${task.id}', 'endTime', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors">
                             </div>
                         </div>
-                        <div class="flex justify-end pt-2 gap-2">
-                            <button onclick="window.deleteTask('${task.id}')" class="text-xs font-bold text-rose-500 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
+                        ` : `
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Difficulty</label>
+                            <div class="grid grid-cols-4 gap-2">
+                                <button type="button" onclick="window.updateTask('${task.id}', 'difficulty', 'quick')" class="py-2 rounded-lg text-xs font-bold border ${task.difficulty === 'quick' ? 'border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35]' : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'} transition-colors">Quick</button>
+                                <button type="button" onclick="window.updateTask('${task.id}', 'difficulty', 'easy')" class="py-2 rounded-lg text-xs font-bold border ${task.difficulty === 'easy' ? 'border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35]' : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'} transition-colors">Easy</button>
+                                <button type="button" onclick="window.updateTask('${task.id}', 'difficulty', 'medium')" class="py-2 rounded-lg text-xs font-bold border ${task.difficulty === 'medium' ? 'border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35]' : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'} transition-colors">Medium</button>
+                                <button type="button" onclick="window.updateTask('${task.id}', 'difficulty', 'hard')" class="py-2 rounded-lg text-xs font-bold border ${task.difficulty === 'hard' ? 'border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35]' : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'} transition-colors">Hard</button>
+                            </div>
+                        </div>
+                        `}
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Date</label>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="window.updateTask('${task.id}', 'date', window.dateFns.format(new Date(), 'yyyy-MM-dd'))" class="px-3 py-2.5 rounded-lg text-xs font-bold border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-colors whitespace-nowrap">Today</button>
+                                <button type="button" onclick="window.updateTask('${task.id}', 'date', window.dateFns.format(window.dateFns.addDays(new Date(), 1), 'yyyy-MM-dd'))" class="px-3 py-2.5 rounded-lg text-xs font-bold border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-colors whitespace-nowrap">Tomorrow</button>
+                                <input type="date" value="${task.date}" onblur="window.updateTask('${task.id}', 'date', this.value)" onchange="window.updateTask('${task.id}', 'date', this.value)" class="flex-1 w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors">
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between pt-4 mt-2 border-t border-slate-800/50 gap-3">
+                            <button onclick="window.deleteTask('${task.id}')" class="p-2.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-colors" title="Delete">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
                             </button>
-                            <button onclick="window.updateTask('${task.id}', 'isWaiting', ${!task.isWaiting})" class="text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                                <i data-lucide="clock" class="w-3.5 h-3.5"></i> ${task.isWaiting ? 'Move to Active' : 'Wait'}
-                            </button>
-                            <button onclick="window.expandTask(null)" class="text-xs font-bold text-white bg-[#ff6b35] hover:bg-[#ff8c61] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                                <i data-lucide="check" class="w-3.5 h-3.5"></i> Done
-                            </button>
+                            <div class="flex items-center gap-2">
+                                <button onclick="window.toggleBookmark('${task.id}')" class="p-2.5 rounded-lg ${isBookmarked ? 'text-yellow-500 bg-yellow-500/10 border border-yellow-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent'} transition-colors" title="${isBookmarked ? 'Unbookmark' : 'Bookmark'}">
+                                    <i data-lucide="bookmark" class="w-4 h-4 ${isBookmarked ? 'fill-yellow-500/20' : ''}"></i>
+                                </button>
+                                <button onclick="window.updateTask('${task.id}', 'isWaiting', ${!task.isWaiting})" class="p-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" title="${task.isWaiting ? 'Move to Active' : 'Wait'}">
+                                    <i data-lucide="clock" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="window.expandTask(null)" class="text-xs font-bold text-white bg-[#ff6b35] hover:bg-[#ff8c61] px-5 py-2.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-lg shadow-[#ff6b35]/20">
+                                    <i data-lucide="check" class="w-4 h-4"></i> Save
+                                </button>
+                            </div>
                         </div>
                     </div>
                     `;
@@ -2281,6 +2323,7 @@
             document.getElementById('task-modal-source').value = task.source || '';
             document.getElementById('task-modal-date').value = task.date || '';
             document.getElementById('task-modal-completed').checked = task.completed || false;
+            document.getElementById('task-modal-bookmarked').checked = task.isBookmarked || false;
 
             // Set difficulty buttons
             const btns = document.querySelectorAll('.modal-diff-btn');
@@ -2325,6 +2368,7 @@
             task.notes = document.getElementById('task-modal-notes').value;
             task.source = document.getElementById('task-modal-source').value;
             task.date = document.getElementById('task-modal-date').value;
+            task.isBookmarked = document.getElementById('task-modal-bookmarked').checked;
             
             const activeBtn = document.querySelector('.modal-diff-btn[data-active="true"]');
             if (activeBtn) {
