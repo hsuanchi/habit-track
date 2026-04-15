@@ -1648,14 +1648,7 @@
                             if (task.type === 'meeting') {
                                 window.openMeetingModal(null, task);
                             } else {
-                                window.expandTask(info.event.id);
-                                // Scroll to the task in the list
-                                setTimeout(() => {
-                                    const taskEl = document.getElementById(`task-el-${info.event.id}`);
-                                    if (taskEl) {
-                                        taskEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                    }
-                                }, 100);
+                                window.openTaskModal(info.event.id);
                             }
                         }
                     }
