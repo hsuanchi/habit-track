@@ -26,6 +26,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
         
@@ -353,10 +356,15 @@
                             <button onclick="calendarInstance.prev()" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
                             <button onclick="calendarInstance.next()" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
                         </div>
-                        <div class="flex items-center gap-1 bg-slate-900/50 p-1 rounded-lg border border-slate-800" id="custom-cal-views">
-                            <button onclick="window.changeCalView('dayGridMonth')" class="cal-view-btn px-3 py-1 text-xs font-bold rounded-md text-slate-400 hover:text-white transition-colors" data-view="dayGridMonth">Month</button>
-                            <button onclick="window.changeCalView('timeGridWeek')" class="cal-view-btn px-3 py-1 text-xs font-bold rounded-md bg-[#ff6b35]/20 text-[#ff6b35] transition-colors" data-view="timeGridWeek">Week</button>
-                            <button onclick="window.changeCalView('timeGridDay')" class="cal-view-btn px-3 py-1 text-xs font-bold rounded-md text-slate-400 hover:text-white transition-colors" data-view="timeGridDay">Day</button>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <div class="flex items-center gap-1 bg-slate-900/50 p-1 rounded-lg border border-slate-800" id="custom-cal-views">
+                                <button onclick="window.changeCalView('dayGridMonth')" class="cal-view-btn px-3 py-1 text-xs font-bold rounded-md text-slate-400 hover:text-white transition-colors" data-view="dayGridMonth">Month</button>
+                                <button onclick="window.changeCalView('timeGridWeek')" class="cal-view-btn px-3 py-1 text-xs font-bold rounded-md bg-[#ff6b35]/20 text-[#ff6b35] transition-colors" data-view="timeGridWeek">Week</button>
+                                <button onclick="window.changeCalView('timeGridDay')" class="cal-view-btn px-3 py-1 text-xs font-bold rounded-md text-slate-400 hover:text-white transition-colors" data-view="timeGridDay">Day</button>
+                            </div>
+                            <button onclick="window.syncGoogleCalendar()" id="sync-gcal-btn" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 hover:text-indigo-300 transition-colors whitespace-nowrap">
+                                <i data-lucide="cloud-upload" class="w-4 h-4"></i> Sync to GCal
+                            </button>
                         </div>
                     </div>
                     <div id="calendar" class="flex-1 w-full h-full text-slate-300 mt-2"></div>
@@ -1535,6 +1543,127 @@
                 });
             }
         };
+
+        let tokenClient;
+        let gcalAccessToken = null;
+
+        window.syncGoogleCalendar = () => {
+            if (!window.VITE_GOOGLE_CLIENT_ID || !navigator.onLine) {
+                alert("同步功能需要網路連線與 Google Calendar 服務設定。如果您在離線環境或尚未設定 VITE_GOOGLE_CLIENT_ID，此功能無法使用。 (Offline or Missing Client ID)");
+                return;
+            }
+
+            if (!tokenClient) {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: window.VITE_GOOGLE_CLIENT_ID,
+                    scope: 'https://www.googleapis.com/auth/calendar.events',
+                    callback: async (response) => {
+                        if (response.error !== undefined) {
+                            console.error('GIS Error:', response);
+                            return;
+                        }
+                        gcalAccessToken = response.access_token;
+                        await performGCalSync();
+                    },
+                });
+            }
+
+            if (gcalAccessToken) {
+                performGCalSync();
+            } else {
+                tokenClient.requestAccessToken({prompt: 'consent'});
+            }
+        };
+
+        async function performGCalSync() {
+            const btn = document.getElementById('sync-gcal-btn');
+            const originalHtml = btn.innerHTML;
+            const loadingHtml = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Syncing...';
+            
+            if (btn) btn.innerHTML = loadingHtml;
+            if (window.lucide) window.lucide.createIcons();
+
+            try {
+                const viewStart = calendarInstance.view.currentStart;
+                const viewEnd = calendarInstance.view.currentEnd;
+                
+                const meetingsToSync = state.tasks.filter(t => t.type === 'meeting' && !t.gcalSynced);
+                let syncedCount = 0;
+
+                for (const t of meetingsToSync) {
+                    const taskStart = new Date(t.date);
+                    let taskEnd = t.endDate ? new Date(t.endDate) : taskStart;
+                    if (t.recurrence && t.recurrence !== 'none') {
+                        // For recurring events, we estimate an end date or just assume it extends
+                        taskEnd = t.recurrenceUntil ? new Date(t.recurrenceUntil) : new Date(viewEnd.getTime() + 86400000); 
+                    }
+
+                    // Check if meeting intersects the current view area
+                    if (taskStart <= viewEnd && taskEnd >= viewStart) {
+                        const eventBody = {
+                            summary: t.title || 'Untitled Meeting',
+                            description: (t.notes || '') + (t.source ? `\n\nSource: ${t.source}` : ''),
+                        };
+
+                        if (t.allDay || !t.startTime) {
+                            eventBody.start = { date: t.date };
+                            let endDate = new Date(t.endDate || t.date);
+                            endDate.setDate(endDate.getDate() + 1);
+                            eventBody.end = { date: window.dateFns ? window.dateFns.format(endDate, 'yyyy-MM-dd') : endDate.toISOString().split('T')[0] };
+                        } else {
+                            const localStart = new Date(`${t.date}T${t.startTime}`);
+                            const endDateStr = t.endDate || t.date;
+                            const localEnd = new Date(`${endDateStr}T${t.endTime || t.startTime}`);
+                            
+                            eventBody.start = { dateTime: localStart.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+                            eventBody.end = { dateTime: localEnd.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+                        }
+
+                        if (t.recurrence && t.recurrence !== 'none') {
+                            let freq = t.recurrence.toUpperCase();
+                            let rrule = `RRULE:FREQ=${freq}`;
+                            if (t.recurrenceUntil) {
+                                const untilStr = t.recurrenceUntil.replace(/-/g, '') + 'T235959Z';
+                                rrule += `;UNTIL=${untilStr}`;
+                            }
+                            eventBody.recurrence = [rrule];
+                        }
+
+                        const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${gcalAccessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(eventBody)
+                        });
+
+                        if (res.ok) {
+                            const data = await res.json();
+                            t.gcalSynced = true;
+                            t.gcalEventId = data.id;
+                            syncedCount++;
+                        } else {
+                            console.error('Failed to sync event to GCal:', await res.text());
+                        }
+                    }
+                }
+
+                if (syncedCount > 0) {
+                    saveData();
+                    renderAll();
+                    alert(`Successfully synced ${syncedCount} new meeting(s) to Google Calendar!`);
+                } else {
+                    alert('No new unsynced meetings found in this view.');
+                }
+            } catch (err) {
+                console.error("GCal Sync Error:", err);
+                alert("Failed to sync with Google Calendar. See console for details.");
+            } finally {
+                if (btn) btn.innerHTML = originalHtml;
+                if (window.lucide) window.lucide.createIcons();
+            }
+        }
 
         function initCalendar() {
             const calendarEl = document.getElementById('calendar');
