@@ -1548,14 +1548,14 @@
         let gcalAccessToken = null;
 
         window.syncGoogleCalendar = () => {
-            if (!window.VITE_GOOGLE_CLIENT_ID || !navigator.onLine) {
-                alert("同步功能需要網路連線與 Google Calendar 服務設定。如果您在離線環境或尚未設定 VITE_GOOGLE_CLIENT_ID，此功能無法使用。 (Offline or Missing Client ID)");
+            if (!navigator.onLine) {
+                alert("同步功能需要網路連線。 (Offline)");
                 return;
             }
 
             if (!tokenClient) {
                 tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: window.VITE_GOOGLE_CLIENT_ID,
+                    client_id: '661946797483-9m4f8dgl98nqsi14g4ltb4pr7igr77ca.apps.googleusercontent.com',
                     scope: 'https://www.googleapis.com/auth/calendar.events',
                     callback: async (response) => {
                         if (response.error !== undefined) {
