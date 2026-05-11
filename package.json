@@ -11,11 +11,10 @@
     "compile": "vite build"
   },
   "dependencies": {
-
+    "puppeteer": "^24.43.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
-    
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

@@ -1,831 +1,4 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Level Up Life</title>
-    <!-- Favicon: Orange background with white lightning bolt -->
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23ff6b35'/%3E%3Cpath d='M55 20 L35 55 H50 L45 85 L65 45 H50 L55 20 Z' fill='white' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E" type="image/svg+xml">
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <!-- Date Fns -->
-    <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
-    <!-- FullCalendar -->
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
-    <!-- SortableJS -->
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
-    <!-- Firebase Compat -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-
-    <!-- Google Identity Services -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
-        
-        body { font-family: 'Inter', sans-serif; }
-        
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #12100f; }
-        ::-webkit-scrollbar-thumb { background: #2a2523; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #3c3532; }
-        
-        .fade-in { animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .hidden { display: none !important; }
-        
-        /* Modern Clean Card */
-        .clean-card {
-            background: #181614;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Custom FullCalendar Now Indicator */
-        .fc .fc-timegrid-now-indicator-arrow { display: none !important; }
-        .fc .fc-timegrid-now-indicator-line {
-            display: block !important;
-            border-top: 1px solid #ff6b35 !important;
-            border-left: none !important;
-            border-right: none !important;
-            border-bottom: none !important;
-            position: absolute;
-            z-index: 50;
-            left: 45px !important; /* Make room for text and dot */
-            right: 0;
-            overflow: visible !important;
-        }
-        .fc .fc-timegrid-now-indicator-line::before {
-            content: var(--now-time, '');
-            position: absolute;
-            left: -48px;
-            top: -7px;
-            color: #ff6b35;
-            font-size: 11px;
-            font-weight: 700;
-            text-shadow: 0 1px 3px #12100f, 0 -1px 3px #12100f, 1px 0 3px #12100f, -1px 0 3px #12100f;
-            padding: 0;
-            z-index: 100;
-            background-color: transparent;
-        }
-        .fc .fc-timegrid-now-indicator-line::after {
-            content: '';
-            position: absolute;
-            left: -8px;
-            top: -4px;
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background-color: #ff6b35;
-            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.2);
-        }
-
-        /* FullCalendar Dark Theme Overrides */
-        .fc-theme-standard td, .fc-theme-standard th { border-color: rgba(255, 255, 255, 0.05) !important; }
-        .fc-theme-standard .fc-scrollgrid { border-top: 1px solid rgba(255, 255, 255, 0.05) !important; border-left: none !important; border-bottom: none !important; border-right: none !important; }
-        .fc .fc-col-header-cell-cushion { padding: 12px 4px !important; color: #cbd5e1; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; line-height: 1.4; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .fc-direction-ltr .fc-timegrid-slot-label-frame { text-align: left; color: #475569; font-size: 11px; padding-left: 8px; }
-        .fc .fc-timegrid-axis-cushion { color: #475569; font-size: 11px; }
-        .fc-timegrid-event { border-radius: 4px !important; box-shadow: none !important; border: none !important; margin: 1px 2px !important; background: transparent !important; }
-        .fc-v-event, .fc-h-event { border: none !important; background: transparent !important; box-shadow: none !important; }
-        .fc-theme-standard .fc-timegrid-slot-minor { border-top-style: none !important; }
-        .fc .fc-day-today { background: rgba(255, 107, 53, 0.02) !important; }
-        .fc-theme-standard .fc-col-header { border-bottom: none !important; }
-        .fc-button-primary { background-color: rgba(255, 255, 255, 0.05) !important; border-color: rgba(255, 255, 255, 0.08) !important; color: #cbd5e1 !important; outline: none !important; }
-        .fc-button-primary:hover { background-color: rgba(255, 255, 255, 0.1) !important; }
-        .fc-button-primary:not(:disabled).fc-button-active, .fc-button-primary:not(:disabled):active { background-color: #ff6b35 !important; border-color: #ff6b35 !important; color: white !important; }
-        .fc-daygrid-day-number { color: #cbd5e1 !important; }
-        .fc-event { padding: 2px 4px !important; font-size: 0.75rem !important; font-weight: 600 !important; cursor: pointer; border: none !important; background: transparent !important; }
-
-        
-        .cal-col-header-day { font-size: 10px; color: #8a8886; font-weight: 700; margin-bottom: 4px; letter-spacing: 0.1em; }
-        .cal-col-header-date { font-size: 18px; color: #f5f5f5; font-weight: 600; }
-        .fc-day-today .cal-col-header-day { color: #ff6b35; }
-        .fc-day-today .cal-col-header-date { color: #ff6b35; border-bottom: 2px solid #ff6b35; padding-bottom: 2px; }
-        .fc-toolbar { flex-wrap: wrap; gap: 8px; justify-content: center !important; }
-        .fc-toolbar-chunk { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
-        @media (max-width: 640px) {
-            .fc-toolbar-title { font-size: 1rem !important; }
-            .fc-header-toolbar { flex-direction: column; gap: 12px; }
-        }
-        
-        /* Tooltip for Heatmap */
-        [data-tooltip]:hover::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.9);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            white-space: nowrap;
-            z-index: 50;
-            pointer-events: none;
-            margin-bottom: 5px;
-            border: 1px solid #333;
-        }
-
-        /* Custom scrollbar for textarea */
-        textarea.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        textarea.custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
-    </style>
-<link rel="stylesheet" href="/index.css">
-</head>
-<body class="bg-[#12100f] text-white antialiased selection:bg-[#ff6b35] selection:text-white min-h-screen flex flex-col">
-
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" class="fixed inset-0 bg-[#12100f] z-[100] flex flex-col items-center justify-center transition-opacity duration-500">
-        <div class="animate-spin text-[#ff6b35] mb-4">
-            <i data-lucide="loader-2" class="w-10 h-10"></i>
-        </div>
-        <p class="text-slate-400 animate-pulse font-medium tracking-wide text-xs uppercase">Loading System...</p>
-    </div>
-
-    <!-- Fix for JS ID Reference -->
-    <span id="user-display-name" class="hidden"></span>
-
-    <!-- Login Screen -->
-    <div id="login-screen" class="hidden min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-        <div class="absolute inset-0 overflow-hidden">
-            <div class="absolute -top-[20%] -right-[10%] w-[600px] h-[600px] bg-[#ff6b35]/10 rounded-full blur-[120px]"></div>
-            <!-- Changed from indigo to rose for a warmer, more consistent background gradient -->
-            <div class="absolute -bottom-[20%] -left-[10%] w-[600px] h-[600px] bg-rose-500/10 rounded-full blur-[120px]"></div>
-        </div>
-
-        <div class="max-w-md w-full clean-card rounded-2xl p-8 relative z-10">
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-[#ff6b35] to-orange-600 rounded-xl mb-4 shadow-lg shadow-orange-500/20">
-                    <i data-lucide="zap" class="w-8 h-8 text-white"></i>
-                </div>
-                <h1 class="text-3xl font-black text-white tracking-tight mb-2">Level Up Life</h1>
-                <p class="text-slate-400 text-sm">Turn your habits into an adventure.</p>
-            </div>
-
-            <div id="iframe-warning" class="hidden mb-6 p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl text-orange-400 text-sm">
-                <div class="flex items-start gap-3">
-                    <i data-lucide="alert-triangle" class="w-5 h-5 flex-shrink-0 mt-0.5"></i>
-                    <p><strong>預覽模式提示：</strong> 由於瀏覽器的安全機制（阻擋第三方 Cookie），在預覽視窗中可能會遇到頻繁登出的問題。建議您點擊右上角的<strong>「在新分頁開啟」</strong>以獲得穩定的登入體驗。</p>
-                </div>
-            </div>
-
-            <div id="auth-error" class="hidden mb-6 bg-red-500/10 border border-red-500/20 text-red-200 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
-                <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i> <span id="auth-error-text"></span>
-            </div>
-
-            <form id="auth-form" class="space-y-4" onsubmit="event.preventDefault()">
-                <div id="username-field" class="hidden">
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Hero Name</label>
-                    <input type="text" id="input-username" class="w-full bg-slate-950/50 border border-slate-800 rounded-xl p-3 text-white placeholder-slate-600 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35] outline-none transition-all" placeholder="Enter your name">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Email</label>
-                    <input type="email" id="input-email" required class="w-full bg-slate-950/50 border border-slate-800 rounded-xl p-3 text-white placeholder-slate-600 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35] outline-none transition-all" placeholder="name@example.com">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Password</label>
-                    <input type="password" id="input-password" required class="w-full bg-slate-950/50 border border-slate-800 rounded-xl p-3 text-white placeholder-slate-600 focus:border-[#ff6b35] focus:ring-1 focus:ring-[#ff6b35] outline-none transition-all" placeholder="••••••••">
-                </div>
-                <button type="submit" id="btn-submit-auth" class="w-full bg-[#ff6b35] hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-orange-500/20 mt-2">
-                    Start Journey
-                </button>
-            </form>
-
-            <div class="mt-6 pt-6 border-t border-slate-800 flex justify-between items-center text-xs font-medium">
-                <button id="btn-toggle-auth-mode" class="text-slate-400 hover:text-[#ff6b35] transition-colors">
-                    Create new account
-                </button>
-                <button id="btn-offline-mode" class="text-slate-600 hover:text-slate-300 transition-colors">
-                    Play Offline
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Dashboard Screen -->
-    <div id="dashboard-screen" class="hidden flex-1 flex flex-col">
-        
-        <!-- Header -->
-        <header class="clean-card border-b border-slate-800 sticky top-0 z-50">
-            <div class="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:h-16 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-4">
-                
-                <!-- Brand -->
-                <div class="flex items-center gap-2 sm:gap-3 w-auto shrink-0 pr-4">
-                    <div class="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-[#ff8c61] to-[#ff6b35] rounded-xl flex items-center justify-center shadow-lg shadow-[#ff6b35]/20">
-                        <i data-lucide="activity" class="w-5 h-5 sm:w-6 sm:h-6 text-white"></i>
-                    </div>
-                    <div>
-                        <span class="font-black text-base sm:text-xl tracking-tight text-white block leading-none">Track</span>
-                        <span class="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider text-slate-400 block mt-1" id="header-date-display">Sat &bull; May 9</span>
-                    </div>
-                </div>
-
-                <!-- Navigation Tabs -->
-                <div class="flex items-center gap-2 sm:gap-4 shrink-0 order-3 sm:order-none w-full sm:w-auto justify-center mt-2 sm:mt-0">
-                    <button id="nav-habits" onclick="switchTab('habits')" class="px-5 py-2 rounded-xl text-[13px] font-bold border border-transparent text-slate-400 hover:text-white transition-all">Habits</button>
-                    <button id="nav-tasks" onclick="switchTab('tasks')" class="px-5 py-2 rounded-xl text-[13px] font-bold border border-[#ff6b35]/50 text-[#ff6b35] transition-all">TaskFlow</button>
-                    <button id="nav-review" onclick="switchTab('review')" class="px-5 py-2 rounded-xl text-[13px] font-bold border border-transparent text-slate-400 hover:text-white transition-all">Review</button>
-                </div>
-
-                <!-- Spacer -->
-                <div class="hidden sm:block flex-1"></div>
-
-                <!-- Simple Level & Stats -->
-                <div class="w-auto flex justify-end items-center gap-3 sm:gap-6 shrink-0 order-2 sm:order-none">
-                    <div class="flex items-center gap-4 sm:gap-6">
-                        
-                        <!-- Streak Pill -->
-                        <div class="hidden md:flex items-center gap-1.5 px-4 py-1.5 rounded-[20px] border border-[#ff6b35]/30 bg-[#ff6b35]/5 shadow-[0_0_10px_rgba(255,107,53,0.1)]">
-                            <i data-lucide="flame" class="w-4 h-4 text-[#ff6b35]"></i>
-                            <span class="text-[13px] font-bold text-white ml-0.5">23</span>
-                            <span class="text-[10px] font-bold text-slate-400 tracking-wider">STREAK</span>
-                        </div>
-
-                        <!-- Mood Faces -->
-                        <div class="hidden lg:flex items-center gap-2 pr-6 border-r border-slate-800">
-                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1">Mood</span>
-                            <div class="flex items-center gap-1.5">
-                                <button class="w-6 h-6 rounded-full flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity"><span class="text-sm">😶</span></button>
-                                <button class="w-6 h-6 rounded-full flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity"><span class="text-sm">😞</span></button>
-                                <button class="w-7 h-7 rounded-full bg-[#ff6b35]/20 flex items-center justify-center shadow-[0_0_8px_rgba(255,107,53,0.3)] opacity-100"><span class="text-sm">😀</span></button>
-                                <button class="w-6 h-6 rounded-full flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity"><span class="text-sm">😁</span></button>
-                                <button class="w-6 h-6 rounded-full flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity"><span class="text-sm">🔥</span></button>
-                            </div>
-                        </div>
-
-                        <!-- Level / XP Simple -->
-                        <div class="flex items-center gap-4">
-                            <div class="flex items-baseline gap-1.5">
-                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">LVL</span>
-                                <span id="top-level" class="text-xl font-bold text-[#ff6b35] leading-none">9</span>
-                            </div>
-                            <div class="flex items-center gap-4">
-                                <div class="w-16 h-1 bg-slate-800 rounded-full overflow-hidden">
-                                    <div id="top-xp-bar" class="h-full bg-[#ff6b35] rounded-full" style="width: 25%"></div>
-                                </div>
-                                <div class="flex flex-col text-[10px] font-medium font-mono leading-none text-right">
-                                    <div class="text-slate-400 mb-0.5"><span id="top-xp-current">106</span> /</div>
-                                    <div class="text-slate-600"><span id="top-xp-next">426</span></div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Logout -->
-                        <div class="flex items-center gap-2 pl-2 sm:pl-4 border-l border-slate-800 border-opacity-50">
-                            <button id="btn-logout" class="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-900/50 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-800 transition-colors" title="Logout">
-                                <i data-lucide="log-out" class="w-4 h-4"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <main class="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-8 w-full flex-1 flex flex-col">
-            
-            <!-- Habits View -->
-            <div id="view-habits" class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8 items-start w-full" style="display: none;">
-                
-                <!-- LEFT COLUMN: Attributes & Consistency -->
-                <div class="space-y-6">
-                    
-                    <!-- Attributes Card (Reduced min-height) -->
-                    <div class="clean-card rounded-2xl p-6 flex flex-col min-h-[300px]">
-                        <div class="flex items-center gap-2 mb-4">
-                             <i data-lucide="activity" class="w-5 h-5 text-[#ff6b35]"></i>
-                             <h3 class="text-lg font-bold text-white">Attributes</h3>
-                        </div>
-
-                        <!-- Chart -->
-                        <div class="relative w-full flex-1 flex items-center justify-center">
-                            <canvas id="radarChart"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Consistency Heatmap -->
-                    <div class="clean-card p-5 rounded-2xl relative">
-                        <div class="mb-4">
-                            <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                                <i data-lucide="layout-grid" class="w-5 h-5 text-[#ff6b35]"></i>
-                                Consistency
-                            </h2>
-                            <!-- Removed 4 Months History Text -->
-                        </div>
-
-                        <div class="space-y-6">
-                            <!-- Good Habits -->
-                            <div>
-                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                    <span class="w-2 h-2 rounded-full bg-[#ff6b35]"></span> Positive
-                                </h4>
-                                <div class="overflow-x-auto custom-scrollbar pb-2">
-                                    <div class="min-w-max flex gap-2">
-                                        <!-- Labels -->
-                                        <div class="flex flex-col justify-between py-[17px] pr-1 text-[9px] text-slate-400 font-bold h-[100px]">
-                                            <span>Mon</span><span>Wed</span><span>Fri</span>
-                                        </div>
-                                        <div class="flex-1">
-                                            <div id="heatmap-months-good" class="flex relative h-4 text-[9px] text-slate-400 font-bold mb-1"></div>
-                                            <div id="heatmap-grid-good" class="grid grid-rows-7 grid-flow-col gap-[3px] h-[81px]"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Bad Habits -->
-                            <div>
-                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                    <span class="w-2 h-2 rounded-full bg-rose-500"></span> Negative
-                                </h4>
-                                <div class="overflow-x-auto custom-scrollbar pb-2">
-                                    <div class="min-w-max flex gap-2">
-                                        <!-- Labels -->
-                                        <div class="flex flex-col justify-between py-[17px] pr-1 text-[9px] text-slate-400 font-bold h-[100px]">
-                                            <span>Mon</span><span>Wed</span><span>Fri</span>
-                                        </div>
-                                        <div class="flex-1">
-                                            <div id="heatmap-months-bad" class="flex relative h-4 text-[9px] text-slate-400 font-bold mb-1"></div>
-                                            <div id="heatmap-grid-bad" class="grid grid-rows-7 grid-flow-col gap-[3px] h-[81px]"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- RIGHT COLUMN: Habits List & Gratitude -->
-                <div class="lg:col-span-2 space-y-6">
-                    
-                    <!-- Habits List -->
-                    <div>
-                        <div class="flex items-center justify-between mb-4 px-1">
-                            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                                <i data-lucide="check-circle-2" class="w-4 h-4 text-[#ff6b35]"></i> Positive Habits
-                            </h3>
-                            <button onclick="openModal('good')" class="text-xs font-bold text-[#ff6b35] hover:bg-[#ff6b35] hover:text-white px-2 py-1 rounded transition-colors border border-[#ff6b35]/30 flex items-center gap-1">
-                                <i data-lucide="plus" class="w-3 h-3"></i> Add
-                            </button>
-                        </div>
-                        <div id="good-habits-list" class="space-y-3"></div>
-                    </div>
-
-                    <!-- Bad Habits List -->
-                    <div>
-                        <div class="flex items-center justify-between mb-4 px-1 mt-8">
-                            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                                <i data-lucide="x-circle" class="w-4 h-4 text-rose-500"></i> Negative Habits
-                            </h3>
-                            <button onclick="openModal('bad')" class="text-xs font-bold text-rose-500 hover:bg-rose-500 hover:text-white px-2 py-1 rounded transition-colors border border-rose-500/30 flex items-center gap-1">
-                                <i data-lucide="plus" class="w-3 h-3"></i> Add
-                            </button>
-                        </div>
-                        <div id="bad-habits-list" class="space-y-3"></div>
-                    </div>
-
-                     <!-- Gratitude Journal (Switched from Amber to Indigo) -->
-                     <div>
-                        <div class="flex items-center justify-between mb-4 px-1 mt-8">
-                            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                                <!-- Changed Icon Color -->
-                                <i data-lucide="book-open" class="w-4 h-4 text-indigo-400"></i> Daily Reflection
-                            </h3>
-                            <button onclick="toggleGratitudeHistory()" class="text-[10px] font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-wider">
-                                History
-                            </button>
-                        </div>
-                        <!-- Changed to Textarea for Shift+Enter support -->
-                        <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-2 flex gap-2 mb-3 focus-within:border-indigo-500/50 transition-colors items-start">
-                             <textarea id="gratitude-input" rows="1" placeholder="What are you grateful for today? (Shift+Enter to send)" class="bg-transparent w-full text-sm text-white placeholder-slate-600 px-2 outline-none resize-none py-1 custom-scrollbar"></textarea>
-                             <!-- Changed Button Color -->
-                             <button id="btn-add-gratitude" class="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg px-3 py-1.5 transition-colors mt-0.5">
-                                <i data-lucide="send" class="w-4 h-4"></i>
-                             </button>
-                        </div>
-                        <!-- Removed Today's list, only rendering history when needed -->
-                        <div id="gratitude-history" class="hidden mt-3 pt-3 border-t border-slate-800 space-y-2 max-h-[300px] overflow-y-auto"></div>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- Tasks View -->
-            <div id="view-tasks" class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8 items-start w-full flex-1" style="display: grid;">
-                <!-- Left: FullCalendar -->
-                <div class="lg:col-span-2 clean-card rounded-2xl p-2 sm:p-6 min-h-[500px] flex flex-col h-full relative">
-                    <!-- Custom Calendar Toolbar -->
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4 px-2 sm:px-0">
-                        <!-- Left: Prev, Next, Today -->
-                        <div class="flex items-center justify-between sm:justify-start gap-3">
-                            <div class="flex items-center gap-1 bg-transparent p-0.5 rounded-xl border border-slate-800">
-                                <button onclick="calendarInstance.prev()" class="p-1 px-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
-                                <div class="w-px h-4 bg-slate-800"></div>
-                                <button onclick="calendarInstance.next()" class="p-1 px-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
-                            </div>
-                            <button onclick="calendarInstance.today()" class="px-4 py-1.5 text-xs font-bold text-slate-400 hover:text-white bg-transparent hover:bg-slate-800/50 border border-slate-800 rounded-xl transition-colors">Today</button>
-                        </div>
-                        
-                        <!-- Center: Title -->
-                        <h2 id="calendar-title" class="text-sm sm:text-base font-medium text-slate-300 pointer-events-none"></h2>
-                        
-                        <!-- Right: Views, Sync -->
-                        <div class="flex flex-wrap items-center justify-end gap-3">
-                            <div class="flex items-center bg-transparent p-0.5 rounded-xl border border-slate-800" id="custom-cal-views">
-                                <button onclick="window.changeCalView('dayGridMonth')" class="cal-view-btn px-4 py-1.5 text-xs font-medium rounded-lg text-slate-400 hover:text-white transition-colors" data-view="dayGridMonth">Month</button>
-                                <button onclick="window.changeCalView('timeGridWeek')" class="cal-view-btn px-4 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-white transition-colors" data-view="timeGridWeek">Week</button>
-                                <button onclick="window.changeCalView('timeGridDay')" class="cal-view-btn px-4 py-1.5 text-xs font-medium rounded-lg text-slate-400 hover:text-white transition-colors" data-view="timeGridDay">Day</button>
-                            </div>
-                            <button onclick="window.syncGoogleCalendar()" id="sync-gcal-btn" class="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-xl bg-[#ff6b35] text-white hover:bg-[#ff8c61] transition-colors shadow-sm whitespace-nowrap">
-                                <i data-lucide="cloud-upload" class="w-4 h-4"></i> Sync to GCal
-                            </button>
-                        </div>
-                    </div>
-                    <div id="calendar" class="flex-1 w-full h-full text-slate-300 mt-2"></div>
-                </div>
-                
-                <!-- Right: Task List -->
-                <div class="space-y-6 flex flex-col h-full">
-                    <div class="clean-card rounded-2xl p-3 sm:p-6 flex flex-col flex-1 max-h-[800px]">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                                <i data-lucide="list-todo" class="w-5 h-5 text-[#ff6b35]"></i> Tasks 
-                                <span id="tasks-count-badge" class="bg-slate-800 text-slate-400 text-[10px] font-bold px-2 py-0.5 rounded-md ml-1">0</span>
-                            </h3>
-                            <div class="flex items-center gap-2">
-                                <button onclick="window.toggleTaskFilter()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors border border-slate-800">
-                                    <i data-lucide="filter" class="w-4 h-4"></i>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <!-- Task Filter (Hidden by default) -->
-                        <div id="task-filter-panel" class="hidden mb-4 p-3 bg-slate-900 rounded-xl border border-slate-800">
-                            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Filter by Source</span>
-                            <div class="flex flex-wrap gap-2" id="task-filter-chips">
-                                <button onclick="window.setTaskFilter('')" class="px-3 py-1 text-[11px] font-bold rounded bg-slate-800 text-white hover:bg-slate-700 transition">All</button>
-                                <!-- Dynamically populated by state.sources -->
-                            </div>
-                        </div>
-                        
-                        <!-- Search Tasks -->
-                        <div class="mb-4 relative">
-                            <div class="bg-[#12100f] border border-slate-800 hover:border-slate-800 rounded-xl px-3 py-2.5 flex items-center gap-2 focus-within:border-[#ff6b35]/50 transition-colors">
-                                <i data-lucide="search" class="w-4 h-4 text-slate-400 ml-1"></i>
-                                <input type="text" id="task-search-input" oninput="window.renderTasks()" placeholder="Search tasks..." class="bg-transparent w-full text-[13px] text-slate-300 placeholder-slate-400 px-1 outline-none">
-                            </div>
-                        </div>
-
-                        <!-- Inline Add Task -->
-                        <div class="mb-6 relative" id="new-task-container">
-                            <div class="bg-transparent border border-dashed border-[#ff6b35]/30 hover:border-[#ff6b35]/60 rounded-xl p-3 flex flex-col gap-2 focus-within:border-[#ff6b35] transition-colors">
-                                <div class="flex items-center gap-2">
-                                    <i data-lucide="plus" class="w-4 h-4 text-[#ff6b35] ml-1"></i>
-                                    <input type="text" id="new-task-input" placeholder="Add a new task... (Enter to save)" class="bg-transparent w-full text-[13px] text-slate-400 placeholder-slate-600 px-1 outline-none">
-                                </div>
-                                
-                                <!-- Options Panel (Hidden by default) -->
-                                <div id="new-task-options" class="hidden flex-col gap-3 pt-3 pb-2 px-2 border-t border-slate-800/50 mt-1">
-                                    <!-- Source Selection -->
-                                    <div>
-                                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Source / Tag</label>
-                                        <div class="flex flex-wrap gap-1.5 mb-1.5" id="task-source-chips">
-                                            <!-- Chips populated dynamically -->
-                                        </div>
-                                        <input type="text" id="new-task-source" placeholder="Or type new source..." class="bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white outline-none focus:border-slate-800 w-full">
-                                    </div>
-                                    
-                                    <!-- Notes -->
-                                    <div>
-                                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Notes</label>
-                                        <textarea id="new-task-notes" placeholder="Add any additional notes here..." rows="2" class="bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white outline-none focus:border-slate-800 w-full resize-none"></textarea>
-                                    </div>
-                                    
-                                    <!-- Difficulty Selection -->
-                                    <div id="difficulty-section">
-                                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Difficulty</label>
-                                        <div class="flex gap-2" id="task-difficulty-btns">
-                                            <button type="button" data-diff="quick" class="diff-btn flex-1 py-1.5 rounded-md text-xs font-bold border border-slate-800 text-slate-400 hover:text-white transition-colors" data-active="false">Quick</button>
-                                            <button type="button" data-diff="easy" class="diff-btn flex-1 py-1.5 rounded-md text-xs font-bold border border-slate-800 text-slate-400 hover:text-white transition-colors" data-active="false">Easy</button>
-                                            <button type="button" data-diff="medium" class="diff-btn flex-1 py-1.5 rounded-md text-xs font-bold border border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35] transition-colors" data-active="true">Medium</button>
-                                            <button type="button" data-diff="hard" class="diff-btn flex-1 py-1.5 rounded-md text-xs font-bold border border-slate-800 text-slate-400 hover:text-white transition-colors" data-active="false">Hard</button>
-                                        </div>
-                                    </div>
-
-                                    <!-- Date Selection -->
-                                    <div>
-                                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Date</label>
-                                        <div class="flex gap-2 items-center flex-wrap" id="task-date-btns">
-                                            <button type="button" data-date="none" class="date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35] transition-colors">No Date</button>
-                                            <button type="button" data-date="today" class="date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-slate-800 text-slate-400 hover:text-white transition-colors">Today</button>
-                                            <button type="button" data-date="tomorrow" class="date-btn px-3 py-1.5 rounded-md text-xs font-bold border border-slate-800 text-slate-400 hover:text-white transition-colors">Tomorrow</button>
-                                            <input type="date" id="new-task-date-picker" class="bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white outline-none focus:border-slate-800 w-full sm:w-auto sm:ml-auto mt-2 sm:mt-0">
-                                        </div>
-                                    </div>
-
-                                    <div class="flex justify-end mt-2">
-                                        <button type="button" id="btn-save-new-item" class="text-xs font-bold text-white bg-[#ff6b35] hover:bg-[#ff8c61] px-4 py-2 rounded-lg transition-colors flex items-center gap-1">
-                                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Active Tasks -->
-                        <div id="active-tasks-list" class="space-y-2 flex-1 overflow-y-auto custom-scrollbar pr-2">
-                            <!-- Tasks will be rendered here -->
-                        </div>
-
-                        <!-- Waiting Tasks (Collapsible) -->
-                        <div class="mt-4 pt-4 border-t border-slate-800">
-                            <button onclick="toggleWaitingTasks()" class="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-slate-300 uppercase tracking-wider w-full transition-colors">
-                                <i data-lucide="chevron-down" id="waiting-tasks-icon" class="w-4 h-4 transition-transform"></i>
-                                WAITING LIST (<span id="waiting-tasks-count">0</span>)
-                            </button>
-                            <div id="waiting-tasks-list" class="hidden mt-3 space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
-                                <!-- Waiting tasks will be rendered here -->
-                            </div>
-                        </div>
-
-                        <!-- Completed Tasks (Collapsible) -->
-                        <div class="mt-4 pt-4 border-t border-slate-800">
-                            <button onclick="toggleCompletedTasks()" class="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-slate-300 uppercase tracking-wider w-full transition-colors">
-                                <i data-lucide="chevron-down" id="completed-tasks-icon" class="w-4 h-4 transition-transform"></i>
-                                COMPLETED (<span id="completed-tasks-count">0</span>)
-                            </button>
-                            <div id="completed-tasks-list" class="hidden mt-3 space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
-                                <!-- Completed tasks will be rendered here -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Review View -->
-            <div id="view-review" class="w-full flex-1 flex-col gap-6" style="display: none;">
-                <!-- Filters -->
-                <div class="flex flex-col xl:flex-row items-start xl:items-center justify-between bg-slate-900/50 p-2 rounded-xl border border-slate-800 gap-3">
-                    <div class="flex flex-wrap gap-2">
-                        <button onclick="setReviewFilter('week')" id="filter-week" class="px-4 py-1.5 rounded-lg text-sm font-bold bg-slate-800 text-white transition-colors">This Week</button>
-                        <button onclick="setReviewFilter('last_week')" id="filter-last_week" class="px-4 py-1.5 rounded-lg text-sm font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">Last Week</button>
-                        <button onclick="setReviewFilter('month')" id="filter-month" class="px-4 py-1.5 rounded-lg text-sm font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">This Month</button>
-                        <button onclick="setReviewFilter('last_month')" id="filter-last_month" class="px-4 py-1.5 rounded-lg text-sm font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">Last Month</button>
-                        <button onclick="setReviewFilter('custom')" id="filter-custom" class="px-4 py-1.5 rounded-lg text-sm font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">Custom</button>
-                    </div>
-                    <div id="custom-date-container" class="hidden flex items-center gap-2 w-full xl:w-auto">
-                        <input type="date" id="custom-start-date" class="bg-slate-800 text-white text-sm rounded-lg px-3 py-1.5 border border-slate-800 focus:outline-none focus:border-[#ff6b35] flex-1 xl:flex-none">
-                        <span class="text-slate-400 text-sm">to</span>
-                        <input type="date" id="custom-end-date" class="bg-slate-800 text-white text-sm rounded-lg px-3 py-1.5 border border-slate-800 focus:outline-none focus:border-[#ff6b35] flex-1 xl:flex-none">
-                        <button onclick="applyCustomDateRange()" class="px-3 py-1.5 rounded-lg text-sm font-bold bg-[#ff6b35] text-white hover:bg-[#e85d2c] transition-colors">Apply</button>
-                    </div>
-                </div>
-
-                <!-- 4 Cards -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="clean-card rounded-2xl p-5 flex flex-col justify-center">
-                        <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Tasks Completed</div>
-                        <div class="text-3xl font-black text-white" id="review-tasks-count">0</div>
-                    </div>
-                    <div class="clean-card rounded-2xl p-5 flex flex-col justify-center">
-                        <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Meetings Attended</div>
-                        <div class="text-3xl font-black text-white" id="review-meetings-count">0</div>
-                    </div>
-                    <div class="clean-card rounded-2xl p-5 flex flex-col justify-center">
-                        <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Total Hours Spent</div>
-                        <div class="text-3xl font-black text-[#ff6b35]" id="review-total-hours">0h</div>
-                    </div>
-                    <div class="clean-card rounded-2xl p-5 flex flex-col justify-center">
-                        <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Top Source (Hours)</div>
-                        <div class="text-3xl font-black text-[#ff6b35] truncate" id="review-top-source">-</div>
-                    </div>
-                </div>
-
-                <!-- Charts & Table -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="clean-card rounded-2xl p-6">
-                        <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">Source Distribution (Hours)</h3>
-                        <div class="h-[300px] relative w-full flex justify-center">
-                            <canvas id="review-doughnut-chart"></canvas>
-                        </div>
-                    </div>
-                    <div class="clean-card rounded-2xl p-6 flex flex-col">
-                        <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">Source Details</h3>
-                        <div class="overflow-y-auto custom-scrollbar flex-1 pr-2" style="max-height: 300px;">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider sticky top-0 bg-slate-900/95 backdrop-blur-sm z-10">
-                                        <th class="pb-3 font-bold">Source</th>
-                                        <th class="pb-3 font-bold text-right">Hours</th>
-                                        <th class="pb-3 font-bold text-right">Count</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="review-source-table-body" class="text-sm text-slate-300">
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- History List -->
-                <div class="clean-card rounded-2xl p-6 flex-1">
-                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">Achievements by Source</h3>
-                    <div id="review-history-list" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <!-- Grouped by source -->
-                    </div>
-                </div>
-            </div>
-
-        </main>
-    </div>
-
-    <!-- Task Edit Modal -->
-    <div id="task-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300" onclick="if(event.target === this) saveTaskModal()">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300" id="task-modal-content">
-            <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
-                <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                    <i data-lucide="list-todo" class="w-5 h-5 text-[#ff6b35]"></i>
-                    Edit Task
-                </h3>
-                <button onclick="closeTaskModal()" class="text-slate-400 hover:text-white transition-colors">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-            <div class="p-5 space-y-4">
-                <input type="hidden" id="task-modal-id">
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Title</label>
-                    <input type="text" id="task-modal-title" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Notes</label>
-                    <textarea id="task-modal-notes" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors resize-none custom-scrollbar" rows="3"></textarea>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Source</label>
-                        <input type="text" id="task-modal-source" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Date</label>
-                        <input type="date" id="task-modal-date" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Difficulty</label>
-                    <div class="flex gap-2" id="task-modal-difficulty-btns">
-                        <button type="button" data-diff="quick" class="modal-diff-btn flex-1 py-1.5 rounded-md text-xs font-bold border border-slate-800 text-slate-400 hover:text-white transition-colors" data-active="false">Quick</button>
-                        <button type="button" data-diff="easy" class="modal-diff-btn flex-1 py-1.5 rounded-md text-xs font-bold border border-slate-800 text-slate-400 hover:text-white transition-colors" data-active="false">Easy</button>
-                        <button type="button" data-diff="medium" class="modal-diff-btn flex-1 py-1.5 rounded-md text-xs font-bold border border-[#ff6b35] bg-[#ff6b35]/10 text-[#ff6b35] transition-colors" data-active="true">Medium</button>
-                        <button type="button" data-diff="hard" class="modal-diff-btn flex-1 py-1.5 rounded-md text-xs font-bold border border-slate-800 text-slate-400 hover:text-white transition-colors" data-active="false">Hard</button>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2 mt-2">
-                    <input type="checkbox" id="task-modal-completed" class="w-4 h-4 rounded border-slate-800 bg-slate-900 text-[#ff6b35] focus:ring-[#ff6b35] focus:ring-offset-slate-900">
-                    <label for="task-modal-completed" class="text-sm font-bold text-slate-300 cursor-pointer">Completed</label>
-                </div>
-                <div class="flex items-center gap-2 mt-2">
-                    <input type="checkbox" id="task-modal-bookmarked" class="w-4 h-4 rounded border-slate-800 bg-slate-900 text-yellow-500 focus:ring-yellow-500 focus:ring-offset-slate-900">
-                    <label for="task-modal-bookmarked" class="text-sm font-bold text-slate-300 cursor-pointer">Bookmarked</label>
-                </div>
-            </div>
-            <div class="p-4 border-t border-slate-800 flex justify-between bg-slate-900">
-                <button onclick="deleteTaskModal()" class="px-4 py-2 rounded-lg text-sm font-bold text-rose-500 hover:bg-rose-500/10 transition-colors">Delete</button>
-                <div class="flex gap-2">
-                    <button onclick="closeTaskModal()" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">Cancel</button>
-                    <button onclick="saveTaskModal()" class="px-4 py-2 rounded-lg text-sm font-bold bg-[#ff6b35] text-white hover:bg-[#ff8c61] transition-colors shadow-lg shadow-[#ff6b35]/20">Save Changes</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Meeting Modal -->
-    <div id="meeting-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300" onclick="if(event.target === this) saveMeeting()">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300" id="meeting-modal-content">
-            <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
-                <h3 class="text-lg font-bold text-white flex items-center gap-2" id="meeting-modal-title">
-                    <i data-lucide="calendar-plus" class="w-5 h-5 text-[#a855f7]"></i>
-                    New Meeting
-                </h3>
-                <button onclick="closeMeetingModal()" class="text-slate-400 hover:text-white transition-colors">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-            <div class="p-5 space-y-4">
-                <input type="hidden" id="meeting-id">
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Title</label>
-                    <input type="text" id="meeting-title" placeholder="Meeting title..." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
-                </div>
-                <div class="flex items-center gap-2 mb-2">
-                    <input type="checkbox" id="meeting-allday" class="w-4 h-4 rounded border-slate-800 bg-slate-900 text-[#a855f7] focus:ring-[#a855f7] focus:ring-offset-slate-900">
-                    <label for="meeting-allday" class="text-sm font-bold text-slate-300 cursor-pointer">All Day Event</label>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Start Date</label>
-                        <input type="date" id="meeting-date" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
-                    </div>
-                    <div class="hidden">
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">End Date (Optional)</label>
-                        <input type="date" id="meeting-end-date" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 gap-4" id="meeting-time-container">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Start Time</label>
-                        <input type="time" id="meeting-start" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
-                    </div>
-                    <div class="hidden">
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">End Time</label>
-                        <input type="time" id="meeting-end" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Repeat</label>
-                        <select id="meeting-repeat" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors" onchange="document.getElementById('meeting-repeat-until-container').classList.toggle('hidden', this.value === 'none')">
-                            <option value="none">Does not repeat</option>
-                            <option value="daily">Daily</option>
-                            <option value="weekly">Weekly</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="yearly">Yearly</option>
-                        </select>
-                    </div>
-                    <div id="meeting-repeat-until-container" class="hidden">
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Repeat Until</label>
-                        <input type="date" id="meeting-repeat-until" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Source / Tag</label>
-                    <input type="text" id="meeting-source" placeholder="e.g., Project A" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
-                    <div id="meeting-source-chips" class="flex flex-wrap gap-1.5 mt-2"></div>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Notes</label>
-                    <textarea id="meeting-notes" placeholder="Meeting agenda or notes..." rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none resize-none custom-scrollbar transition-colors"></textarea>
-                </div>
-            </div>
-            <div class="p-4 border-t border-slate-800 flex justify-between bg-slate-900">
-                <button type="button" id="btn-delete-meeting" onclick="deleteMeeting()" class="hidden text-sm font-bold text-rose-500 hover:bg-rose-500/10 px-4 py-2 rounded-lg transition-colors flex items-center gap-1">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i> Delete
-                </button>
-                <div class="flex gap-2 ml-auto">
-                    <button type="button" onclick="closeMeetingModal()" class="text-sm font-bold text-slate-400 hover:text-white px-4 py-2 rounded-lg transition-colors">Cancel</button>
-                    <button type="button" onclick="saveMeeting()" class="text-sm font-bold text-white bg-[#a855f7] hover:bg-[#9333ea] px-5 py-2 rounded-lg transition-colors shadow-lg shadow-[#a855f7]/20">Save</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal -->
-    <div id="habit-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-        <div class="clean-card w-full max-w-md p-6 rounded-2xl shadow-2xl">
-            <h3 id="modal-title" class="text-xl font-bold mb-6 text-white flex items-center gap-2">Add Quest</h3>
-            <div class="space-y-5">
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Title</label>
-                    <input type="text" id="modal-habit-title" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:border-[#ff6b35] outline-none transition-all" placeholder="e.g. Read 10 mins">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Attribute Reward</label>
-                    <div class="grid grid-cols-3 gap-2" id="modal-stat-selector"></div>
-                </div>
-            </div>
-            <div class="flex gap-3 mt-8 pt-6 border-t border-slate-800">
-                <button onclick="closeModal()" class="flex-1 py-2.5 rounded-lg border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 text-sm font-bold transition-colors">Cancel</button>
-                <button id="btn-save-habit" class="flex-1 py-2.5 rounded-lg text-white text-sm font-bold bg-[#ff6b35] hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/20">Create</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast Container -->
-    <!-- Saving Indicator -->
-    <div id="saving-indicator" class="fixed bottom-6 right-6 z-[100] hidden items-center gap-2 px-4 py-2 rounded-full bg-[#1e293b]/90 border border-[#334155] text-[#ff6b35] backdrop-blur-md shadow-lg pointer-events-none transition-all duration-300">
-        <i data-lucide="save" class="w-4 h-4 animate-pulse"></i>
-        <span class="text-xs font-bold tracking-wider">SAVING...</span>
-    </div>
-    
-    <!-- Last Modified Indicator -->
-    <div id="last-modified-indicator" class="fixed bottom-6 left-6 z-[90] hidden items-center gap-2 px-3 py-1.5 rounded-full bg-[#1e293b]/60 border border-[#334155]/50 text-slate-400 backdrop-blur-sm pointer-events-none transition-all duration-300">
-        <i data-lucide="clock" class="w-3 h-3"></i>
-        <span class="text-[10px] font-medium tracking-wide" id="last-modified-text"></span>
-    </div>
-
-    <div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
-
-    <script>
         const firebaseConfig = {
             apiKey: "AIzaSyA8TJUSbLBabNuW5RqAwWWOtxL-pZ4iOSc",
             authDomain: "habit-track-4e1c9.firebaseapp.com",
@@ -896,7 +69,7 @@
             
             activeSources.forEach(s => {
                 const isActive = state.ui.taskFilterSource === s;
-                html += `<button oncontextmenu="event.preventDefault(); window.deleteSourceTag('${s}')" title="Right-click to delete" onclick="window.setTaskFilter('${s}')" class="px-3 py-1 text-[11px] font-bold rounded ${isActive ? 'bg-[#ff6b35] text-white' : 'bg-slate-800 text-white hover:bg-slate-700'} transition">${s}</button>`;
+                html += `<button onclick="window.setTaskFilter('${s}')" class="px-3 py-1 text-[11px] font-bold rounded ${isActive ? 'bg-[#ff6b35] text-white' : 'bg-slate-800 text-white hover:bg-slate-700'} transition">${s}</button>`;
             });
             container.innerHTML = html;
         };
@@ -1551,11 +724,8 @@
                             <div class="flex items-center gap-3 overflow-hidden">
                                 ${item.isBookmarked ? '<i data-lucide="bookmark" class="w-4 h-4 text-yellow-500 shrink-0 fill-yellow-500/20"></i>' : `<i data-lucide="${icon}" class="w-4 h-4 ${iconColor} shrink-0"></i>`}
                                 <div class="flex flex-col truncate">
-                                    <span class="text-sm font-medium ${item.isBookmarked ? 'text-yellow-500' : 'text-slate-300'} truncate">${item.title}</span>
-                                    <span class="text-xs text-slate-400">
-                                        ${dateStr}
-                                        ${(item.type === 'meeting' && item.startTime) ? `<span class="ml-1 text-[#a855f7]">${item.startTime}</span>` : ''}
-                                    </span>
+                                    <span class="text-sm font-medium text-slate-300 truncate">${item.title}</span>
+                                    <span class="text-xs text-slate-400">${dateStr}</span>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 shrink-0 ml-2">
@@ -1819,7 +989,6 @@
                     initialView: 'timeGridWeek',
                     scrollTime: '09:00:00',
                     headerToolbar: false,
-                    displayEventEnd: false,
                     height: '100%',
                     nowIndicator: true,
                     dayHeaderFormat: { weekday: 'short', month: 'numeric', day: 'numeric', omitCommas: true },
@@ -1875,9 +1044,6 @@
                         };
 
                         let drawColor = getHexColor(source);
-                        if (props.isBookmarked) {
-                            drawColor = '#eab308'; // Golden yellow if bookmarked
-                        }
                         
                         let borderColor, bgColor, textColor, icon;
                         
@@ -1887,17 +1053,10 @@
                             textColor = '#cbd5e1';
                             icon = '';
                         } else if (completed) {
-                            if (props.isBookmarked) {
-                                borderColor = '#ca8a04'; // yellow-600
-                                bgColor = 'transparent';
-                                textColor = '#ca8a04';
-                                icon = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;flex-shrink:0;color:#ca8a04;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-                            } else {
-                                borderColor = 'transparent';
-                                bgColor = 'transparent';
-                                textColor = '#64748b';
-                                icon = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;flex-shrink:0;color:#64748b;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-                            }
+                            borderColor = 'transparent';
+                            bgColor = 'transparent';
+                            textColor = '#64748b';
+                            icon = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;flex-shrink:0;color:#64748b;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
                         } else {
                             borderColor = drawColor;
                             bgColor = 'transparent'; // No background fill
@@ -1912,7 +1071,7 @@
                         // If they liked the `border: 1px solid ${borderColor}50; background: ${borderColor}10;`, let's just restore that exactly but with the colors.
                         
                         html = `
-                            <div class="w-full h-full flex items-center overflow-hidden px-1.5 py-0.5 rounded-[4px]" style="border: 1px solid ${completed && !props.isBookmarked ? 'transparent' : borderColor}; background: ${(completed && !props.isBookmarked) ? 'transparent' : bgColor};">
+                            <div class="w-full h-full flex items-center overflow-hidden px-1.5 py-0.5 rounded-[4px]" style="border: 1px solid ${completed ? 'transparent' : borderColor}; background: ${completed ? 'transparent' : bgColor};">
                                 ${icon}
                                 <div class="font-medium text-[11px] leading-tight truncate" style="color: ${textColor}">${title}</div>
                                 ${timeText}
@@ -2051,7 +1210,7 @@
 
                 let containerClass = `task-item bg-transparent hover:bg-slate-900/50 rounded-xl p-2 sm:p-3 transition-colors border ${isExpanded ? 'border-[#ff6b35]/50' : 'border-transparent'}`;
                 if (isBookmarked) {
-                    containerClass = `task-item bg-yellow-500/5 border ${isExpanded ? 'border-yellow-400/80 shadow-[0_0_15px_rgba(234,179,8,0.15)]' : 'border-yellow-500/30'} rounded-xl p-2 sm:p-3 transition-colors`;
+                    containerClass = `task-item bg-yellow-500/5 border ${isExpanded ? 'border-yellow-400/50' : 'border-transparent'} rounded-xl p-2 sm:p-3 transition-colors`;
                 }
 
                 let html = `
@@ -2060,7 +1219,7 @@
                         <div class="drag-handle cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400 opacity-50 flex-shrink-0" onclick="event.stopPropagation()">
                             <i data-lucide="grip-vertical" class="w-4 h-4"></i>
                         </div>
-                        <div onclick="event.stopPropagation(); window.toggleTask('${task.id}')" class="w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center flex-shrink-0 transition-colors ${isCompleted ? (isBookmarked ? 'border-yellow-500/50 bg-yellow-500/50' : 'border-[#475569] bg-[#475569]') : (isBookmarked ? 'border-yellow-500 hover:border-yellow-400' : 'border-slate-400 hover:border-slate-600')}">
+                        <div onclick="event.stopPropagation(); window.toggleTask('${task.id}')" class="w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center flex-shrink-0 transition-colors ${isCompleted ? 'border-[#475569] bg-[#475569]' : 'border-slate-400 hover:border-slate-600'}">
                             ${isCompleted ? '<i data-lucide="check" class="w-3.5 h-3.5 text-white stroke-[3]"></i>' : (isMeeting ? '<i data-lucide="users" class="w-3 h-3 text-slate-400"></i>' : '')}
                         </div>
                         
@@ -2073,7 +1232,7 @@
                         ` : ''}
 
                         <div class="flex-1 min-w-0">
-                            <h4 class="text-[13px] font-medium ${isCompleted ? (isBookmarked ? 'text-yellow-600' : 'text-slate-400') : (isBookmarked ? 'text-yellow-500' : 'text-slate-300')} truncate">${task.title}</h4>
+                            <h4 class="text-[13px] font-medium ${isCompleted ? 'text-slate-400' : 'text-slate-300'} truncate">${task.title}</h4>
                         </div>
 
                         ${isBookmarked ? `
@@ -2083,7 +1242,7 @@
                         ` : ''}
 
                         <div class="flex items-center gap-2 flex-shrink-0">
-                            ${(isMeeting && task.startTime) ? `<span class="text-xs text-[#a855f7] font-medium">${task.startTime}</span>` : ''}
+                            ${task.time ? `<span class="text-xs text-slate-400 font-medium">${task.time}</span>` : ''}
                         </div>
                     </div>
                 `;
@@ -2105,9 +1264,11 @@
                         </div>
                         ${isMeeting ? `
                         <div>
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Start Time</label>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Time</label>
                             <div class="flex items-center gap-2">
                                 <input type="time" value="${task.startTime || ''}" onblur="window.updateTask('${task.id}', 'startTime', this.value)" onchange="window.updateTask('${task.id}', 'startTime', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors">
+                                <span class="text-slate-400 text-xs font-bold">to</span>
+                                <input type="time" value="${task.endTime || ''}" onblur="window.updateTask('${task.id}', 'endTime', this.value)" onchange="window.updateTask('${task.id}', 'endTime', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors">
                             </div>
                         </div>
                         ` : `
@@ -2260,7 +1421,7 @@
         function renderDate() {
             if(!window.dateFns) return;
             const today = new Date();
-            const headerDateFmt = dateFns.format(today, "E '&bull;' MMM d");
+            const headerDateFmt = dateFns.format(today, 'E &bull; MMM d');
             const hDisplay = document.getElementById('header-date-display');
             if (hDisplay) hDisplay.innerHTML = headerDateFmt;
 
@@ -2608,10 +1769,6 @@
                         t.source = '';
                     }
                 });
-                state.sources = state.sources.filter(s => s !== sourceName);
-                if (state.ui.taskFilterSource === sourceName) {
-                    state.ui.taskFilterSource = '';
-                }
                 window.renderTasks();
                 window.updateCalendarEvents();
                 window.saveData();
@@ -2630,6 +1787,9 @@
             taskSources.forEach(s => {
                 if (!state.sources.includes(s)) state.sources.push(s);
             });
+            
+            // Filter state.sources to only include sources that actually exist in tasks
+            state.sources = state.sources.filter(s => taskSources.includes(s));
 
             const chipHTML = (s, targetId) => `
                 <div class="source-chip flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium transition-colors border border-slate-800" data-source="${s}">
@@ -2637,8 +1797,9 @@
                         <i data-lucide="grip-vertical" class="w-2.5 h-2.5"></i>
                     </div>
                     <button type="button" 
-                        oncontextmenu="event.preventDefault(); window.deleteSourceTag('${s}')" title="Right-click to delete"
                         onclick="document.getElementById('${targetId}').value = '${s}'" 
+                        oncontextmenu="event.preventDefault(); window.deleteSourceTag('${s}')"
+                        title="Right-click to delete"
                         class="flex-1 text-left">
                         ${s}
                     </button>
@@ -2930,18 +2091,6 @@
             safeCreateIcons();
             initCalendar();
             initNewTaskOptions();
-            
-            // Now Indicator Time Updater
-            setInterval(() => {
-                const nowLines = document.querySelectorAll('.fc-timegrid-now-indicator-line');
-                if (nowLines.length > 0) {
-                    const d = new Date();
-                    const h = d.getHours();
-                    const m = d.getMinutes().toString().padStart(2, '0');
-                    const timeStr = `${h}:${m}`;
-                    nowLines.forEach(line => line.style.setProperty('--now-time', '"' + timeStr + '"'));
-                }
-            }, 1000);
             
             // Meeting modal all-day toggle
             document.getElementById('meeting-allday')?.addEventListener('change', (e) => {
@@ -3304,7 +2453,4 @@
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
         }
-    </script>
-<script type="module" src="/index.tsx"></script>
-</body>
-</html>
+    
