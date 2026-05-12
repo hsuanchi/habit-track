@@ -10,24 +10,24 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script defer src="https://unpkg.com/lucide@latest"></script>
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <!-- Date Fns -->
-    <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
     <!-- FullCalendar -->
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    <script defer src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
     <!-- SortableJS -->
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
     <!-- Firebase Compat -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Google Identity Services -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script defer src="https://accounts.google.com/gsi/client" async></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
@@ -68,14 +68,12 @@
             content: var(--now-time, '');
             position: absolute;
             left: -48px;
-            top: -7px;
+            top: -9px;
             color: #ff6b35;
             font-size: 11px;
             font-weight: 700;
-            text-shadow: 0 1px 3px #12100f, 0 -1px 3px #12100f, 1px 0 3px #12100f, -1px 0 3px #12100f;
-            padding: 0;
-            z-index: 100;
-            background-color: transparent;
+            background-color: #12100f;
+            padding: 0 4px;
         }
         .fc .fc-timegrid-now-indicator-line::after {
             content: '';
@@ -736,17 +734,17 @@
                         <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Start Date</label>
                         <input type="date" id="meeting-date" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
                     </div>
-                    <div class="hidden">
+                    <div>
                         <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">End Date (Optional)</label>
                         <input type="date" id="meeting-end-date" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
                     </div>
                 </div>
-                <div class="grid grid-cols-1 gap-4" id="meeting-time-container">
+                <div class="grid grid-cols-2 gap-4" id="meeting-time-container">
                     <div>
                         <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Start Time</label>
                         <input type="time" id="meeting-start" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
                     </div>
-                    <div class="hidden">
+                    <div>
                         <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">End Time</label>
                         <input type="time" id="meeting-end" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#a855f7] outline-none transition-colors">
                     </div>
@@ -1554,7 +1552,7 @@
                                     <span class="text-sm font-medium ${item.isBookmarked ? 'text-yellow-500' : 'text-slate-300'} truncate">${item.title}</span>
                                     <span class="text-xs text-slate-400">
                                         ${dateStr}
-                                        ${(item.type === 'meeting' && item.startTime) ? `<span class="ml-1 text-[#a855f7]">${item.startTime}</span>` : ''}
+                                        ${(item.type === 'meeting' && item.startTime) ? `<span class="ml-1 text-[#a855f7]">${item.startTime}${item.endTime ? ` - ${item.endTime}` : ''}</span>` : ''}
                                     </span>
                                 </div>
                             </div>
@@ -1631,12 +1629,12 @@
                 
                 if (t.recurrence && t.recurrence !== 'none' && window.dateFns) {
                     let currentDate = new Date(t.date);
-                    const limitDate = t.recurrenceUntil ? new Date(t.recurrenceUntil) : dateFns.addYears(new Date(), 2);
-                    const hardLimit = dateFns.addYears(new Date(), 2);
+                    const limitDate = t.recurrenceUntil ? new Date(t.recurrenceUntil) : dateFns.addMonths(new Date(), 3);
+                    const hardLimit = dateFns.addMonths(new Date(), 3);
                     const finalLimit = limitDate < hardLimit ? limitDate : hardLimit;
                     
                     let i = 0;
-                    while (currentDate <= finalLimit && i < 730) {
+                    while (currentDate <= finalLimit && i < 150) {
                         i++;
                         if (t.recurrence === 'daily') currentDate = dateFns.addDays(currentDate, 1);
                         else if (t.recurrence === 'weekly') currentDate = dateFns.addWeeks(currentDate, 1);
@@ -2105,9 +2103,11 @@
                         </div>
                         ${isMeeting ? `
                         <div>
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Start Time</label>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Time</label>
                             <div class="flex items-center gap-2">
                                 <input type="time" value="${task.startTime || ''}" onblur="window.updateTask('${task.id}', 'startTime', this.value)" onchange="window.updateTask('${task.id}', 'startTime', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors">
+                                <span class="text-slate-400 text-xs font-bold">to</span>
+                                <input type="time" value="${task.endTime || ''}" onblur="window.updateTask('${task.id}', 'endTime', this.value)" onchange="window.updateTask('${task.id}', 'endTime', this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-[#ff6b35] outline-none transition-colors">
                             </div>
                         </div>
                         ` : `
