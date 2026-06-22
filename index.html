@@ -1483,12 +1483,13 @@
                 if (sortedSources.length === 0) {
                     tableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-slate-400">No data available</td></tr>';
                 } else {
+                    let tableHtml = '';
                     sortedSources.forEach((src, index) => {
                         const stats = sourceStats[src];
                         // Get color from gradient based on index, fallback to last color if out of bounds
                         const colorIndex = Math.min(index, doughnutColors.length - 1);
                         const color = doughnutColors[colorIndex] || '#ff6b35';
-                        tableBody.innerHTML += `
+                        tableHtml += `
                             <tr class="border-b border-slate-800/50 hover:bg-slate-900 transition-colors">
                                 <td class="py-3 font-medium text-slate-300 flex items-center gap-2">
                                     <span class="w-2 h-2 rounded-full" style="background-color: ${color}"></span>
@@ -1499,6 +1500,7 @@
                             </tr>
                         `;
                     });
+                    tableBody.innerHTML = tableHtml;
                 }
             }
 
@@ -1513,6 +1515,7 @@
             }
 
             // Use the already sorted 'sortedSources' array for the history list
+            let historyHtml = '';
             sortedSources.forEach(src => {
                 const stats = sourceStats[src];
                 // Sort items by date descending
@@ -1565,8 +1568,9 @@
                 });
 
                 html += `</div></div>`;
-                historyContainer.innerHTML += html;
+                historyHtml += html;
             });
+            historyContainer.innerHTML = historyHtml;
 
             if (window.lucide) window.lucide.createIcons({ root: historyContainer });
         }
@@ -2172,18 +2176,26 @@
                 return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
             });
 
+            let completedHtml = '';
+            let waitingHtml = '';
+            let activeHtml = '';
+
             sortedTasks.forEach(task => {
                 if (task.completed) {
-                    completedList.innerHTML += createTaskHTML(task);
+                    completedHtml += createTaskHTML(task);
                     completedTasksCount++;
                 } else if (task.isWaiting) {
-                    waitingList.innerHTML += createTaskHTML(task);
+                    waitingHtml += createTaskHTML(task);
                     waitingTasksCount++;
                 } else {
-                    activeList.innerHTML += createTaskHTML(task);
+                    activeHtml += createTaskHTML(task);
                     activeTasksCount++;
                 }
             });
+
+            completedList.innerHTML = completedHtml;
+            waitingList.innerHTML = waitingHtml;
+            activeList.innerHTML = activeHtml;
 
             if (activeList.innerHTML === '') {
                 activeList.innerHTML = `<div class="text-center py-8 border-2 border-dashed border-slate-800/50 rounded-xl text-slate-600"><p class="text-sm">No active tasks. You're all caught up!</p></div>`;
@@ -2391,8 +2403,12 @@
                     <button onclick="event.stopPropagation(); window.deleteHabit('${habit.id}')" class="p-2 text-slate-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity relative z-20"><i data-lucide="trash" class="w-4 h-4"></i></button>
                 </div>`;
             };
-            state.habits.filter(h => h.type === 'good').forEach(h => goodList.innerHTML += createHabitHTML(h));
-            state.habits.filter(h => h.type === 'bad').forEach(h => badList.innerHTML += createHabitHTML(h));
+            let goodHtml = '';
+            let badHtml = '';
+            state.habits.filter(h => h.type === 'good').forEach(h => goodHtml += createHabitHTML(h));
+            state.habits.filter(h => h.type === 'bad').forEach(h => badHtml += createHabitHTML(h));
+            goodList.innerHTML = goodHtml;
+            badList.innerHTML = badHtml;
             if(goodList.innerHTML === '') goodList.innerHTML = `<div class="text-center py-6 border-2 border-dashed border-slate-800/50 rounded-xl text-slate-600"><p class="text-xs">No active quests today.</p></div>`;
             if(badList.innerHTML === '') badList.innerHTML = `<div class="text-center py-6 border-2 border-dashed border-slate-800/50 rounded-xl text-slate-600"><p class="text-xs">All clear.</p></div>`;
         }
@@ -2421,6 +2437,7 @@
                 const totalWeeks = Math.ceil(days.length / 7);
                 
                 let html = '';
+                let monthsHtml = '';
                 let currentMonth = -1;
                 
                 days.forEach((day, index) => {
@@ -2432,7 +2449,7 @@
                         const weekIdx = Math.floor(index / 7);
                         const leftPos = (weekIdx / totalWeeks) * 100;
                         if(leftPos < 90) { 
-                           monthsContainer.innerHTML += `<div style="position:absolute; left:${leftPos}%">${dateFns.format(day, 'MMM')}</div>`;
+                           monthsHtml += `<div style="position:absolute; left:${leftPos}%">${dateFns.format(day, 'MMM')}</div>`;
                         }
                     }
 
@@ -2459,6 +2476,7 @@
                     html += `<div ${clickEvent} data-tooltip="${isFuture ? '' : dateStr}" class="rounded-sm ${cursor} transition-all ${colorClass} ${border}"></div>`;
                 });
                 grid.innerHTML = html;
+                monthsContainer.innerHTML = monthsHtml;
             };
 
             renderGrid('good', 'good');
